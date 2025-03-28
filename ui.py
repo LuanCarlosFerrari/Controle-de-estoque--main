@@ -264,14 +264,15 @@ class EstoqueUI:
         self.preco_entry.delete(0, "end")
         self.produtos_quantidade_entry.delete(0, "end")
         
-        # Exibir mensagem de sucesso
-        self.display_area.insert("end", f"Produto '{nome}' adicionado com sucesso! Código: {codigo}\n")
-        
         # Salvar estoque automaticamente após adicionar
         self.estoque.salvar_estoque()
         
-        # Atualizar a visualização do estoque
+        # Atualizar a visualização para a tabela
         self.exibir_estoque()
+        
+        # Adicionar mensagem de sucesso depois de atualizar a visualização
+        if hasattr(self, 'display_area'):
+            self.display_area.insert("end", f"Produto '{nome}' adicionado com sucesso! Código: {codigo}\n")
 
     def remover_produto(self):
         codigo = self.codigo_entry.get()
