@@ -1,4 +1,6 @@
 import customtkinter as ctk
+from models.estoque import Estoque
+from models.clientes import Clientes
 import csv
 
 class Estoque:
@@ -140,17 +142,21 @@ class EstoqueUI:
 
         input_frame.columnconfigure((0, 1, 2, 3, 4, 5, 6, 7), weight=1)
 
-        ctk.CTkLabel(input_frame, text="Nome:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        ctk.CTkLabel(input_frame, text="Código:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        self.codigo_entry = ctk.CTkEntry(input_frame)
+        self.codigo_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+
+        ctk.CTkLabel(input_frame, text="Nome:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
         self.nome_entry = ctk.CTkEntry(input_frame)
-        self.nome_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.nome_entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
 
-        ctk.CTkLabel(input_frame, text="Preço:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+        ctk.CTkLabel(input_frame, text="Preço:").grid(row=0, column=4, padx=5, pady=5, sticky="e")
         self.preco_entry = ctk.CTkEntry(input_frame)
-        self.preco_entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
+        self.preco_entry.grid(row=0, column=5, padx=5, pady=5, sticky="ew")
 
-        ctk.CTkLabel(input_frame, text="Quantidade:").grid(row=0, column=4, padx=5, pady=5, sticky="e")
-        self.quantidade_entry = ctk.CTkEntry(input_frame)
-        self.quantidade_entry.grid(row=0, column=5, padx=5, pady=5, sticky="ew")
+        ctk.CTkLabel(input_frame, text="Quantidade:").grid(row=0, column=6, padx=5, pady=5, sticky="e")
+        self.produtos_quantidade_entry = ctk.CTkEntry(input_frame)
+        self.produtos_quantidade_entry.grid(row=0, column=7, padx=5, pady=5, sticky="ew")
 
         button_frame = ctk.CTkFrame(self.produtos_tab)
         button_frame.pack(padx=20, pady=10)
@@ -268,20 +274,36 @@ class EstoqueUI:
     def adicionar_produto(self):
         nome = self.nome_entry.get().strip()
         preco = self.preco_entry.get().strip()
-        quantidade = self.quantidade_entry.get().strip()
+        quantidade = self.produtos_quantidade_entry.get().strip()
+
+        # Depuração: Exibir valores capturados
+        self.display_area.insert("end", f"Depuração: Nome='{nome}', Preço='{preco}', Quantidade='{quantidade}'\n")
 
         # Verificar se todos os campos estão preenchidos
-        if not (nome and preco and quantidade):
-            self.display_area.insert("end", "Todos os campos devem ser preenchidos para adicionar um produto.\n")
+        if not nome:
+            self.display_area.insert("end", "Erro: O campo Nome está vazio.\n")
+            return
+        if not preco:
+            self.display_area.insert("end", "Erro: O campo Preço está vazio.\n")
+            return
+        if not quantidade:
+            self.display_area.insert("end", "Erro: O campo Quantidade está vazio.\n")
             return
 
         try:
             preco = float(preco)
-            quantidade = int(quantidade)
-            codigo = self.estoque.adicionar_produto(nome, preco, quantidade)
-            self.display_area.insert("end", f"Produto {nome} adicionado com sucesso! Código: {codigo}\n")
         except ValueError:
-            self.display_area.insert("end", "Erro: Preço deve ser um número e Quantidade deve ser um inteiro.\n")
+            self.display_area.insert("end", "Erro: Preço deve ser um número válido.\n")
+            return
+
+        try:
+            quantidade = int(quantidade)
+        except ValueError:
+            self.display_area.insert("end", "Erro: Quantidade deve ser um número inteiro válido.\n")
+            return
+
+        codigo = self.estoque.adicionar_produto(nome, preco, quantidade)
+        self.display_area.insert("end", f"Produto {nome} adicionado com sucesso! Código: {codigo}\n")
 
     def remover_produto(self):
         codigo = self.codigo_entry.get()
@@ -301,7 +323,7 @@ class EstoqueUI:
         codigo = self.codigo_entry.get()
         nome = self.nome_entry.get() or None
         preco = self.preco_entry.get()
-        quantidade = self.quantidade_entry.get()
+        quantidade = self.produtos_quantidade_entry.get()
 
         if not codigo:
             self.display_area.insert("end", "O campo Código deve ser preenchido para atualizar um produto.\n")
