@@ -364,6 +364,131 @@ class EstoqueUI:
                 
         except ValueError:
             self.display_area.insert("end", "Erro: Código deve ser um número inteiro, Preço deve ser um número e Quantidade deve ser um inteiro.\n")
+            
+    def atualizar_produto_selecionado(self):
+        """Abre um diálogo para atualizar os produtos selecionados na tabela."""
+        # Verificar quais produtos estão selecionados
+        produtos_selecionados = []
+        
+        for item_id, dados in self.selected_items.items():
+            if dados["selected"]:
+                produto_id = dados["produto_id"]
+                produtos_selecionados.append(produto_id)
+        
+        if not produtos_selecionados:
+            self.display_area.insert("end", "Nenhum produto selecionado para atualização.\n")
+            return
+            
+        # Criar uma janela de diálogo para entrada de dados
+        dialog = ctk.CTkToplevel(self.window)
+        dialog.title("Atualizar Produtos")
+        dialog.geometry("500x300")
+        dialog.transient(self.window)  # Torna o diálogo modal
+        dialog.grab_set()  # Impede interação com a janela principal
+        dialog.resizable(False, False)  # Impede redimensionamento
+        
+        # Centralizar o diálogo na janela principal
+        # Calcular posição x, y para centralizar
+        window_width = self.window.winfo_width()
+        window_height = self.window.winfo_height()
+        window_x = self.window.winfo_x()
+        window_y = self.window.winfo_y()
+        
+        dialog_width = 500
+        dialog_height = 300
+        
+        position_x = window_x + (window_width - dialog_width) // 2
+        position_y = window_y + (window_height - dialog_height) // 2
+        
+        # Definir a geometria com a posição calculada
+        dialog.geometry(f"{dialog_width}x{dialog_height}+{position_x}+{position_y}")
+        
+        # Adicionar widgets ao diálogo
+        ctk.CTkLabel(dialog, text=f"Atualizando {len(produtos_selecionados)} produto(s)", font=("Arial", 16)).pack(pady=10)
+        
+        # Frame para os campos de entrada
+        input_frame = ctk.CTkFrame(dialog)
+        input_frame.pack(padx=20, pady=10, fill="x")
+        
+        # Configurar o input_frame para ter duas colunas com pesos iguais
+        input_frame.columnconfigure(0, weight=1)
+        input_frame.columnconfigure(1, weight=3)
+        
+        # Campos para atualização
+        ctk.CTkLabel(input_frame, text="Nome:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        nome_entry = ctk.CTkEntry(input_frame)
+        nome_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        
+        ctk.CTkLabel(input_frame, text="Preço:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        preco_entry = ctk.CTkEntry(input_frame)
+        preco_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        
+        ctk.CTkLabel(input_frame, text="Quantidade:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        quantidade_entry = ctk.CTkEntry(input_frame)
+        quantidade_entry.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+        
+        # Texto explicativo
+        ctk.CTkLabel(dialog, text="Deixe em branco os campos que não deseja alterar", font=("Arial", 12)).pack(pady=5)
+        
+        # Função para processar a atualização
+        def processar_atualizacao():
+            nome = nome_entry.get() or None
+            preco_str = preco_entry.get()
+            quantidade_str = quantidade_entry.get()
+            
+            try:
+                preco = float(preco_str) if preco_str else None
+                quantidade = int(quantidade_str) if quantidade_str else None
+                
+                # Atualizar cada produto selecionado
+                for produto_id in produtos_selecionados:
+                    self.estoque.atualizar_produto(produto_id, nome, preco, quantidade)
+                
+                # Salvar as alterações
+                self.estoque.salvar_estoque()
+                
+                # Fechar o diálogo
+                dialog.destroy()
+                
+                # Atualizar a visualização
+                self.exibir_estoque()
+                
+                # Mostrar mensagem de sucesso
+                if hasattr(self, 'display_area'):
+                    self.display_area.insert("end", f"{len(produtos_selecionados)} produto(s) atualizado(s) com sucesso: {', '.join(map(str, produtos_selecionados))}\n")
+                
+            except ValueError:
+                error_label.configure(text="Erro: Preço deve ser um número e Quantidade deve ser um número inteiro")
+        
+        # Botões
+        button_frame = ctk.CTkFrame(dialog)
+        button_frame.pack(pady=10)
+        
+        ctk.CTkButton(button_frame, text="Atualizar", command=processar_atualizacao).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Cancelar", command=dialog.destroy).pack(side="left", padx=5)
+        
+        # Label para mensagens de erro
+        error_label = ctk.CTkLabel(dialog, text="", text_color="red")
+        error_label.pack(pady=5)
+        
+        # Ajuste para garantir que a centralização seja aplicada após a criação da janela
+        # Este update assegura que o tamanho da janela principal seja corretamente medido
+        self.window.update_idletasks()
+        
+        # Recalcular posição após o update
+        window_width = self.window.winfo_width()
+        window_height = self.window.winfo_height()
+        window_x = self.window.winfo_x()
+        window_y = self.window.winfo_y()
+        
+        position_x = window_x + (window_width - dialog_width) // 2
+        position_y = window_y + (window_height - dialog_height) // 2
+        
+        # Aplicar a geometria atualizada
+        dialog.geometry(f"{dialog_width}x{dialog_height}+{position_x}+{position_y}")
+        
+        # Definir o foco no campo de nome
+        nome_entry.focus_set()
 
     def reativar_produto(self):
         codigo = self.codigo_entry.get()
@@ -466,7 +591,7 @@ class EstoqueUI:
                         elif child.cget("text") == "Reativar":
                             child.configure(command=self.reativar_produto_selecionado)
                         elif child.cget("text") == "Atualizar":
-                            child.configure(command=self.preparar_atualizacao_selecionado)
+                            child.configure(command=self.atualizar_produto_selecionado)
 
     def adicionar_cliente(self):
         nome = self.cliente_nome_entry.get()
