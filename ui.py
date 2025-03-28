@@ -3,112 +3,6 @@ from models.estoque import Estoque
 from models.clientes import Clientes
 import csv
 
-class Estoque:
-    def __init__(self, arquivo_csv="estoque.csv"):
-        self.produtos = {}
-        self.arquivo_csv = arquivo_csv
-        self.proximo_codigo = 1  # Inicializa o próximo código como 1
-        self.carregar_estoque()
-
-    def carregar_estoque(self):
-        try:
-            with open(self.arquivo_csv, mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.DictReader(file)
-                for linha in reader:
-                    codigo = int(linha["codigo"])
-                    nome = linha["nome"]
-                    preco = float(linha["preco"])
-                    quantidade = int(linha["quantidade"])
-                    status = linha["status"]
-                    self.produtos[codigo] = {"nome": nome, "preco": preco, "quantidade": quantidade, "status": status}
-                    self.proximo_codigo = max(self.proximo_codigo, codigo + 1)  # Atualiza o próximo código
-        except FileNotFoundError:
-            pass
-
-    def salvar_estoque(self):
-        with open(self.arquivo_csv, mode='w', newline='', encoding='utf-8') as file:
-            fieldnames = ["codigo", "nome", "preco", "quantidade", "status"]
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
-            for codigo, dados in self.produtos.items():
-                writer.writerow({"codigo": codigo, "nome": dados["nome"], "preco": dados["preco"], "quantidade": dados["quantidade"], "status": dados["status"]})
-
-    def adicionar_produto(self, nome, preco, quantidade):
-        codigo = self.proximo_codigo
-        self.produtos[codigo] = {"nome": nome, "preco": preco, "quantidade": quantidade, "status": "ativo"}
-        self.proximo_codigo += 1
-        return codigo
-
-    def remover_produto(self, codigo):
-        if codigo in self.produtos:
-            self.produtos[codigo]["status"] = "excluido"
-
-    def atualizar_produto(self, codigo, nome=None, preco=None, quantidade=None):
-        if codigo in self.produtos and self.produtos[codigo]["status"] == "ativo":
-            if nome:
-                self.produtos[codigo]["nome"] = nome
-            if preco:
-                self.produtos[codigo]["preco"] = preco
-            if quantidade is not None:
-                self.produtos[codigo]["quantidade"] = quantidade
-
-    def reativar_produto(self, codigo):
-        if codigo in self.produtos and self.produtos[codigo]["status"] == "excluido":
-            self.produtos[codigo]["status"] = "ativo"
-
-class Clientes:
-    def __init__(self, arquivo_csv="clientes.csv"):
-        self.clientes = {}
-        self.arquivo_csv = arquivo_csv
-        self.proximo_codigo = 1  # Inicializa o próximo código como 1
-        self.carregar_clientes()
-
-    def carregar_clientes(self):
-        try:
-            with open(self.arquivo_csv, mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.DictReader(file)
-                for linha in reader:
-                    codigo = int(linha["codigo"])
-                    nome = linha["nome"]
-                    mesa = linha["mesa"]
-                    telefone = linha.get("telefone", "")
-                    status = linha["status"]
-                    self.clientes[codigo] = {"nome": nome, "mesa": mesa, "telefone": telefone, "status": status}
-                    self.proximo_codigo = max(self.proximo_codigo, codigo + 1)  # Atualiza o próximo código
-        except FileNotFoundError:
-            pass
-
-    def salvar_clientes(self):
-        with open(self.arquivo_csv, mode='w', newline='', encoding='utf-8') as file:
-            fieldnames = ["codigo", "nome", "mesa", "telefone", "status"]
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
-            for codigo, dados in self.clientes.items():
-                writer.writerow({"codigo": codigo, "nome": dados["nome"], "mesa": dados["mesa"], "telefone": dados["telefone"], "status": dados["status"]})
-
-    def adicionar_cliente(self, nome, mesa, telefone=""):
-        codigo = self.proximo_codigo
-        self.clientes[codigo] = {"nome": nome, "mesa": mesa, "telefone": telefone, "status": "ativo"}
-        self.proximo_codigo += 1
-        return codigo
-
-    def remover_cliente(self, codigo):
-        if codigo in self.clientes:
-            self.clientes[codigo]["status"] = "excluido"
-
-    def atualizar_cliente(self, codigo, nome=None, mesa=None, telefone=None):
-        if codigo in self.clientes and self.clientes[codigo]["status"] == "ativo":
-            if nome:
-                self.clientes[codigo]["nome"] = nome
-            if mesa:
-                self.clientes[codigo]["mesa"] = mesa
-            if telefone:
-                self.clientes[codigo]["telefone"] = telefone
-
-    def reativar_cliente(self, codigo):
-        if codigo in self.clientes and self.clientes[codigo]["status"] == "excluido":
-            self.clientes[codigo]["status"] = "ativo"
-
 class EstoqueUI:
     def __init__(self):
         self.estoque = Estoque()
@@ -118,6 +12,9 @@ class EstoqueUI:
         self.window = ctk.CTk()
         self.window.title("Sistema de Controle")
         self.window.geometry("1000x600")  # Ajustado para apresentar todas as abas adequadamente
+
+        # Exibir estoque ao iniciar para confirmar carregamento
+        print(f"Estoque carregado: {self.estoque.produtos}")
 
         # Configuração do sistema de abas
         self.tabview = ctk.CTkTabview(self.window)
@@ -134,7 +31,49 @@ class EstoqueUI:
         self.setup_clientes_tab()
         self.setup_consumo_tab()
         self.setup_caixa_tab()
-
+        
+    def habilitar_para_remocao(self):
+        # Limpar o campo de código e habilitar para inserção
+        self.codigo_entry.configure(state="normal")  # Habilita o campo
+        self.codigo_entry.delete(0, "end")  # Limpa o conteúdo existente
+        self.display_area.insert("end", "Digite o código do produto que deseja remover e clique em 'Remover'.\n")
+        
+        # Redefinir função do botão Remover
+        for widget in self.produtos_tab.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkButton) and child.cget("text") == "Remover":
+                        child.configure(command=self.remover_produto)
+                        
+    def habilitar_para_atualizacao(self):
+        # Limpar e habilitar campos para atualização
+        self.codigo_entry.configure(state="normal")  # Habilita o campo
+        self.codigo_entry.delete(0, "end")  # Limpa o conteúdo existente
+        self.nome_entry.delete(0, "end")
+        self.preco_entry.delete(0, "end")
+        self.produtos_quantidade_entry.delete(0, "end")
+        self.display_area.insert("end", "Digite o código do produto que deseja atualizar, preencha apenas os campos que deseja modificar e clique em 'Atualizar'.\n")
+        
+        # Redefinir função do botão Atualizar
+        for widget in self.produtos_tab.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkButton) and child.cget("text") == "Atualizar":
+                        child.configure(command=self.atualizar_produto)
+                        
+    def habilitar_para_reativacao(self):
+        # Limpar o campo de código e habilitar para inserção
+        self.codigo_entry.configure(state="normal")  # Habilita o campo
+        self.codigo_entry.delete(0, "end")  # Limpa o conteúdo existente
+        self.display_area.insert("end", "Digite o código do produto que deseja reativar e clique em 'Reativar'.\n")
+        
+        # Redefinir função do botão Reativar
+        for widget in self.produtos_tab.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkButton) and child.cget("text") == "Reativar":
+                        child.configure(command=self.reativar_produto)
+    
     def setup_produtos_tab(self):
         # Reutilizar a lógica existente para a aba de produtos
         input_frame = ctk.CTkFrame(self.produtos_tab)
@@ -142,9 +81,14 @@ class EstoqueUI:
 
         input_frame.columnconfigure((0, 1, 2, 3, 4, 5, 6, 7), weight=1)
 
+        # Campos de entrada com labels
         ctk.CTkLabel(input_frame, text="Código:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
         self.codigo_entry = ctk.CTkEntry(input_frame)
         self.codigo_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        
+        # Adicionar texto de placeholder no campo de código
+        self.codigo_entry.insert(0, "Gerado pelo sistema")
+        self.codigo_entry.configure(state="disabled")  # Desabilita o campo por padrão
 
         ctk.CTkLabel(input_frame, text="Nome:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
         self.nome_entry = ctk.CTkEntry(input_frame)
@@ -161,10 +105,11 @@ class EstoqueUI:
         button_frame = ctk.CTkFrame(self.produtos_tab)
         button_frame.pack(padx=20, pady=10)
 
+        # Botões de ação
         ctk.CTkButton(button_frame, text="Adicionar", command=self.adicionar_produto).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Remover", command=self.remover_produto).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Atualizar", command=self.atualizar_produto).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Reativar", command=self.reativar_produto).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Remover", command=self.habilitar_para_remocao).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Atualizar", command=self.habilitar_para_atualizacao).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Reativar", command=self.habilitar_para_reativacao).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Exibir Estoque", command=self.exibir_estoque).pack(side="left", padx=5)
 
         self.display_area = ctk.CTkTextbox(self.produtos_tab, height=300)
@@ -220,12 +165,23 @@ class EstoqueUI:
         # Centralizar e organizar as caixas de entrada
         input_frame.columnconfigure((0, 1, 2, 3, 4, 5), weight=1)
 
+        # Preparar listas de nomes para os comboboxes
+        cliente_nomes = []
+        for codigo, cliente in self.clientes.clientes.items():
+            if cliente["status"] == "ativo":
+                cliente_nomes.append(f"{codigo} - {cliente['nome']}")
+                
+        produto_nomes = []
+        for codigo, produto in self.estoque.produtos.items():
+            if produto["status"] == "ativo":
+                produto_nomes.append(f"{codigo} - {produto['nome']}")
+
         ctk.CTkLabel(input_frame, text="Cliente:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        self.cliente_combobox = ctk.CTkComboBox(input_frame, values=list(self.clientes.clientes.values()))
+        self.cliente_combobox = ctk.CTkComboBox(input_frame, values=cliente_nomes)
         self.cliente_combobox.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
         ctk.CTkLabel(input_frame, text="Produto:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
-        self.produto_combobox = ctk.CTkComboBox(input_frame, values=list(self.estoque.produtos.values()))
+        self.produto_combobox = ctk.CTkComboBox(input_frame, values=produto_nomes)
         self.produto_combobox.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
 
         ctk.CTkLabel(input_frame, text="Quantidade:").grid(row=0, column=4, padx=5, pady=5, sticky="e")
@@ -269,15 +225,53 @@ class EstoqueUI:
 
     def exibir_consumos(self):
         self.consumo_display_area.delete("1.0", "end")
-        self.consumo_display_area.insert("end", "Lista de consumos ainda não implementada.\n")
+        
+        # Cabeçalho formatado com espaçamento uniforme
+        header = f"{'ID':<5} {'Cliente':<15} {'Produto':<15} {'Quantidade':<10} {'Valor':<10} {'Data/Hora':<15}\n"
+        self.consumo_display_area.insert("end", header)
+        
+        # Linha de separação
+        separator = "-" * 70 + "\n"
+        self.consumo_display_area.insert("end", separator)
+        
+        # Dados de exemplo para demonstração
+        dados_exemplo = [
+            {"id": 1, "cliente": "Mesa 01", "produto": "Refrigerante", "quantidade": 2, "valor": 8.00, "data": "28/03 14:30"},
+            {"id": 2, "cliente": "Mesa 02", "produto": "Pizza", "quantidade": 1, "valor": 45.00, "data": "28/03 14:45"}
+        ]
+        
+        # Preencher com dados de exemplo
+        row_idx = 1
+        for item in dados_exemplo:
+            # Criar linha formatada com espaçamento uniforme
+            linha = f"{item['id']:<5} {item['cliente']:<15} {item['produto']:<15} {item['quantidade']:<10} {f'R$ {item['valor']:.2f}':<10} {item['data']:<15}\n"
+            
+            # Inserir a linha no texto
+            self.consumo_display_area.insert("end", linha)
+            
+            # Alternar cor de fundo para linhas pares e ímpares
+            tag_name = f"row_{row_idx}"
+            self.consumo_display_area.tag_add(tag_name, f"{row_idx+1}.0", f"{row_idx+2}.0")
+            
+            # Definir cores alternadas para linhas
+            if row_idx % 2 == 0:
+                self.consumo_display_area.tag_config(tag_name, background="#EFEFEF")
+            else:
+                self.consumo_display_area.tag_config(tag_name, background="#DFDFDF")
+            
+            row_idx += 1
+            
+        # Mensagem informativa
+        if not dados_exemplo:
+            self.consumo_display_area.insert("end", "Nenhum consumo registrado.\n")
+        
+        # Nota explicativa
+        self.consumo_display_area.insert("end", "\nNota: Esta é uma visualização de exemplo. O registro de consumos será implementado em breve.\n")
 
     def adicionar_produto(self):
         nome = self.nome_entry.get().strip()
         preco = self.preco_entry.get().strip()
         quantidade = self.produtos_quantidade_entry.get().strip()
-
-        # Depuração: Exibir valores capturados
-        self.display_area.insert("end", f"Depuração: Nome='{nome}', Preço='{preco}', Quantidade='{quantidade}'\n")
 
         # Verificar se todos os campos estão preenchidos
         if not nome:
@@ -302,8 +296,25 @@ class EstoqueUI:
             self.display_area.insert("end", "Erro: Quantidade deve ser um número inteiro válido.\n")
             return
 
+        # Adicionar o produto e obter o código
         codigo = self.estoque.adicionar_produto(nome, preco, quantidade)
-        self.display_area.insert("end", f"Produto {nome} adicionado com sucesso! Código: {codigo}\n")
+        
+        # Mostrar o código gerado no campo de código
+        self.codigo_entry.configure(state="normal")
+        self.codigo_entry.delete(0, "end")
+        self.codigo_entry.insert(0, str(codigo))
+        self.codigo_entry.configure(state="disabled")
+        
+        # Limpar os outros campos para facilitar a adição de um novo produto
+        self.nome_entry.delete(0, "end")
+        self.preco_entry.delete(0, "end")
+        self.produtos_quantidade_entry.delete(0, "end")
+        
+        # Exibir mensagem de sucesso
+        self.display_area.insert("end", f"Produto '{nome}' adicionado com sucesso! Código: {codigo}\n")
+        
+        # Salvar estoque automaticamente após adicionar
+        self.estoque.salvar_estoque()
 
     def remover_produto(self):
         codigo = self.codigo_entry.get()
@@ -354,12 +365,83 @@ class EstoqueUI:
 
     def exibir_estoque(self):
         self.display_area.delete("1.0", "end")
+        
+        # Verifica se há produtos no estoque
         if not self.estoque.produtos:
             self.display_area.insert("end", "Estoque vazio.\n")
-        else:
-            for codigo, dados in self.estoque.produtos.items():
-                info = f"Código: {codigo} | Nome: {dados['nome']} | Preço: R${dados['preco']:.2f} | Quantidade: {dados['quantidade']} | Status: {dados['status']}\n"
-                self.display_area.insert("end", info)
+            return
+            
+        # Exibe mensagem de carregamento
+        self.display_area.insert("end", "Carregando dados do estoque...\n")
+        self.window.update()  # Força atualização da interface
+        
+        # Remove a mensagem de carregamento
+        self.display_area.delete("1.0", "end")
+        
+        # Cabeçalho formatado com espaçamento uniforme - usando texto em negrito manualmente
+        header = f"{'CÓDIGO':<10} {'NOME':<20} {'PREÇO (R$)':<15} {'QUANTIDADE':<15} {'STATUS':<10}\n"
+        self.display_area.insert("end", header)
+        
+        # Linha de separação
+        separator = "-" * 70 + "\n"
+        self.display_area.insert("end", separator)
+        
+        # Preparar dados para exibição
+        produtos_para_exibir = []
+        for codigo, dados in self.estoque.produtos.items():
+            produtos_para_exibir.append((codigo, dados))
+        
+        # Ordenar por código para melhor visualização
+        produtos_para_exibir.sort(key=lambda x: x[0])
+        
+        # Preencher com dados
+        linha_atual = 3  # Começa na linha 3 (após cabeçalho e separador)
+        for i, (codigo, dados) in enumerate(produtos_para_exibir):
+            # Criar linha formatada com espaçamento uniforme
+            linha = f"{codigo:<10} {dados['nome']:<20} {dados['preco']:<15.2f} {dados['quantidade']:<15} {dados['status']:<10}\n"
+            
+            # Inserir a linha no texto
+            self.display_area.insert("end", linha)
+            
+            # Tag para colorir a linha inteira
+            linha_tag = f"linha_{i}"
+            
+            # Adicionar tag à linha (do início ao fim da linha atual)
+            self.display_area.tag_add(linha_tag, f"{linha_atual}.0", f"{linha_atual+1}.0")
+            
+            # Definir cores alternadas para linhas
+            if i % 2 == 0:
+                self.display_area.tag_config(linha_tag, background="#EFEFEF")
+            else:
+                self.display_area.tag_config(linha_tag, background="#DFDFDF")
+            
+            # Adicionar tag para colorir o status
+            status_tag = f"status_{i}"
+            
+            # Calcular posição aproximada do status na linha (próximo ao final)
+            posicao_status = 10 + 20 + 15 + 15 + 1  # Soma das larguras das colunas anteriores
+            
+            # Adicionar tag para o status
+            self.display_area.tag_add(status_tag, f"{linha_atual}.{posicao_status}", f"{linha_atual}.{posicao_status + 10}")
+            
+            # Colorir o status
+            if dados['status'] == "ativo":
+                self.display_area.tag_config(status_tag, foreground="#008800")  # Verde para ativos
+            else:
+                self.display_area.tag_config(status_tag, foreground="#FF0000")  # Vermelho para excluídos
+            
+            linha_atual += 1  # Avança para a próxima linha
+        
+        # Exibir um resumo
+        total_itens = len(produtos_para_exibir)
+        ativos = sum(1 for _, dados in produtos_para_exibir if dados['status'] == 'ativo')
+        excluidos = total_itens - ativos
+        
+        self.display_area.insert("end", "\n")
+        resumo = f"Total de produtos: {total_itens} (Ativos: {ativos}, Excluídos: {excluidos})\n"
+        self.display_area.insert("end", resumo)
+        self.display_area.tag_add("resumo", f"{float(self.display_area.index('end')) - 1:.1f}", "end")
+        self.display_area.tag_config("resumo", font=("Arial", 10, "bold"))
 
     def adicionar_cliente(self):
         nome = self.cliente_nome_entry.get()
@@ -422,10 +504,54 @@ class EstoqueUI:
         self.clientes_display_area.delete("1.0", "end")
         if not self.clientes.clientes:
             self.clientes_display_area.insert("end", "Nenhum cliente/mesa cadastrado.\n")
-        else:
-            for codigo, dados in self.clientes.clientes.items():
-                info = f"Código: {codigo} | Nome: {dados['nome']} | Documento: {dados['mesa']} | Telefone: {dados.get('telefone', 'N/A')} | Status: {dados['status']}\n"
-                self.clientes_display_area.insert("end", info)
+            return
+        
+        # Cabeçalho formatado com espaçamento uniforme
+        header = f"{'Código':<10} {'Nome':<20} {'Mesa/Doc':<15} {'Telefone':<15} {'Status':<10}\n"
+        self.clientes_display_area.insert("end", header, "header")
+        self.clientes_display_area.tag_config("header", font=("Arial", 11, "bold"))
+        
+        # Linha de separação
+        separator = "-" * 70 + "\n"
+        self.clientes_display_area.insert("end", separator)
+        
+        # Preencher com dados
+        row_idx = 1
+        for codigo, dados in self.clientes.clientes.items():
+            # Criar linha formatada com espaçamento uniforme
+            linha = f"{codigo:<10} {dados['nome']:<20} {dados['mesa']:<15} {dados.get('telefone', 'N/A'):<15} {dados['status']:<10}\n"
+            
+            # Tag para colorir a linha inteira
+            line_tag = f"line_{row_idx}"
+            
+            # Inserir a linha no texto com tag
+            self.clientes_display_area.insert("end", linha, line_tag)
+            
+            # Definir cores alternadas para linhas
+            if row_idx % 2 == 0:
+                self.clientes_display_area.tag_config(line_tag, background="#EFEFEF")
+            else:
+                self.clientes_display_area.tag_config(line_tag, background="#DFDFDF")
+            
+            # Adicionar tag para colorir o status
+            status_tag = f"status_{row_idx}"
+            line_count = float(self.clientes_display_area.index("end").split(".")[0])
+            current_line = line_count - 1  # A linha atual é a última linha inserida
+            
+            # Calcular a posição inicial e final do texto do status na linha
+            status_position = linha.rfind(dados['status'])
+            if status_position != -1:
+                start_pos = f"{current_line}.{status_position}"
+                end_pos = f"{current_line}.{status_position + len(dados['status'])}"
+                
+                self.clientes_display_area.tag_add(status_tag, start_pos, end_pos)
+                
+                if dados['status'] == "ativo":
+                    self.clientes_display_area.tag_config(status_tag, foreground="#008800")  # Verde para ativos
+                else:
+                    self.clientes_display_area.tag_config(status_tag, foreground="#FF0000")  # Vermelho para excluídos
+            
+            row_idx += 1
 
     def salvar_e_sair(self):
         self.estoque.salvar_estoque()
