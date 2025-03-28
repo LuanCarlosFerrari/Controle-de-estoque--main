@@ -345,8 +345,23 @@ class EstoqueUI:
             codigo = int(codigo)
             preco = float(preco) if preco else None
             quantidade = int(quantidade) if quantidade else None
+            
+            # Atualizar o produto no sistema
             self.estoque.atualizar_produto(codigo, nome, preco, quantidade)
-            self.display_area.insert("end", f"Produto com código {codigo} atualizado com sucesso!\n")
+            
+            # Salvar as alterações no estoque
+            self.estoque.salvar_estoque()
+            
+            # Criar uma mensagem informativa para ser exibida após a atualização da visualização
+            mensagem = f"Produto com código {codigo} atualizado com sucesso!\n"
+            
+            # Atualizar a visualização (isso recria todos os widgets, incluindo a área de texto)
+            self.exibir_estoque()
+            
+            # Após a atualização, mostrar a mensagem na nova área de texto
+            if hasattr(self, 'display_area'):
+                self.display_area.insert("end", mensagem)
+                
         except ValueError:
             self.display_area.insert("end", "Erro: Código deve ser um número inteiro, Preço deve ser um número e Quantidade deve ser um inteiro.\n")
 
@@ -619,43 +634,61 @@ class EstoqueUI:
     def remover_produto_selecionado(self):
         """Remove todos os produtos selecionados na tabela."""
         produtos_removidos = 0
+        produtos_ids = []  # Lista para armazenar todos os IDs dos produtos removidos
         
         for item_id, dados in self.selected_items.items():
             if dados["selected"]:
                 produto_id = dados["produto_id"]
                 self.estoque.remover_produto(produto_id)
                 produtos_removidos += 1
+                produtos_ids.append(produto_id)
         
         if produtos_removidos > 0:
-            # Atualizar a mensagem na área de texto
-            self.display_area.insert("end", f"{produtos_removidos} produto(s) marcado(s) como excluído(s).\n")
             # Salvar as alterações no estoque
             self.estoque.salvar_estoque()
-            # Atualizar a visualização
+            
+            # Criar uma área de texto temporária para manter as mensagens
+            mensagens = f"{produtos_removidos} produto(s) marcado(s) como excluído(s): {', '.join(map(str, produtos_ids))}\n"
+            
+            # Atualizar a visualização (isso recria todos os widgets, incluindo a área de texto)
             self.exibir_estoque()
+            
+            # Após a atualização, mostrar as mensagens na nova área de texto
+            if hasattr(self, 'display_area'):
+                self.display_area.insert("end", mensagens)
         else:
+            # Não é necessário atualizar a visualização se nenhum produto foi removido
             self.display_area.insert("end", "Nenhum produto selecionado para remoção.\n")
-    
+
     def reativar_produto_selecionado(self):
         """Reativa todos os produtos selecionados na tabela."""
         produtos_reativados = 0
+        produtos_ids = []  # Lista para armazenar todos os IDs dos produtos reativados
         
         for item_id, dados in self.selected_items.items():
             if dados["selected"]:
                 produto_id = dados["produto_id"]
                 self.estoque.reativar_produto(produto_id)
                 produtos_reativados += 1
+                produtos_ids.append(produto_id)
         
         if produtos_reativados > 0:
-            # Atualizar a mensagem na área de texto
-            self.display_area.insert("end", f"{produtos_reativados} produto(s) reativado(s).\n")
             # Salvar as alterações no estoque
             self.estoque.salvar_estoque()
-            # Atualizar a visualização
-            self.exibir_estoque()
-        else:
-            self.display_area.insert("end", "Nenhum produto selecionado para reativação.\n")
             
+            # Criar uma área de texto temporária para manter as mensagens
+            mensagens = f"{produtos_reativados} produto(s) reativado(s): {', '.join(map(str, produtos_ids))}\n"
+            
+            # Atualizar a visualização (isso recria todos os widgets, incluindo a área de texto)
+            self.exibir_estoque()
+            
+            # Após a atualização, mostrar as mensagens na nova área de texto
+            if hasattr(self, 'display_area'):
+                self.display_area.insert("end", mensagens)
+        else:
+            # Não é necessário atualizar a visualização se nenhum produto foi reativado
+            self.display_area.insert("end", "Nenhum produto selecionado para reativação.\n")
+
     def preparar_atualizacao_selecionado(self):
         """Prepara a atualização do primeiro produto selecionado."""
         # Verificar se há algum produto selecionado
