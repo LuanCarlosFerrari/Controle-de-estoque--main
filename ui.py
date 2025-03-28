@@ -509,34 +509,46 @@ class EstoqueUI:
             return
         
         # Cabeçalho formatado com espaçamento uniforme
-        header = f"{'Código':<10} {'Nome':<20} {'Mesa/Doc':<15} {'Telefone':<15} {'Status':<10}\n"
-        self.clientes_display_area.insert("end", header, "header")
-        self.clientes_display_area.tag_config("header", font=("Arial", 11, "bold"))
+        header = f"{'CÓDIGO':<10} {'NOME':<20} {'MESA/DOC':<15} {'TELEFONE':<15} {'STATUS':<10}\n"
+        self.clientes_display_area.insert("end", header)
+        self.clientes_display_area.tag_add("header", "1.0", "2.0")
+        self.clientes_display_area.tag_config("header", foreground="#FFFFFF", background="#1F538D")
         
         # Linha de separação
         separator = "-" * 70 + "\n"
         self.clientes_display_area.insert("end", separator)
         
-        # Preencher com dados
-        row_idx = 1
+        # Preparar dados para exibição
+        clientes_para_exibir = []
         for codigo, dados in self.clientes.clientes.items():
+            clientes_para_exibir.append((codigo, dados))
+        
+        # Ordenar por código para melhor visualização
+        clientes_para_exibir.sort(key=lambda x: x[0])
+        
+        # Preencher com dados
+        linha_atual = 3  # Começa na linha 3 (após cabeçalho e separador)
+        for i, (codigo, dados) in enumerate(clientes_para_exibir):
             # Criar linha formatada com espaçamento uniforme
             linha = f"{codigo:<10} {dados['nome']:<20} {dados['mesa']:<15} {dados.get('telefone', 'N/A'):<15} {dados['status']:<10}\n"
             
+            # Inserir a linha no texto
+            self.clientes_display_area.insert("end", linha)
+            
             # Tag para colorir a linha inteira
-            line_tag = f"line_{row_idx}"
+            linha_tag = f"linha_{i}"
             
-            # Inserir a linha no texto com tag
-            self.clientes_display_area.insert("end", linha, line_tag)
+            # Adicionar tag à linha (do início ao fim da linha atual)
+            self.clientes_display_area.tag_add(linha_tag, f"{linha_atual}.0", f"{linha_atual+1}.0")
             
-            # Definir cores alternadas para linhas
-            if row_idx % 2 == 0:
-                self.clientes_display_area.tag_config(line_tag, background="#EFEFEF")
+            # Definir cores alternadas para linhas - Fundo escuro e letras claras
+            if i % 2 == 0:
+                self.clientes_display_area.tag_config(linha_tag, foreground="#FFFFFF", background="#2B2B2B")  # Escuro mais claro
             else:
-                self.clientes_display_area.tag_config(line_tag, background="#DFDFDF")
+                self.clientes_display_area.tag_config(linha_tag, foreground="#FFFFFF", background="#1E1E1E")  # Escuro mais escuro
             
             # Adicionar tag para colorir o status
-            status_tag = f"status_{row_idx}"
+            status_tag = f"status_{i}"
             line_count = float(self.clientes_display_area.index("end").split(".")[0])
             current_line = line_count - 1  # A linha atual é a última linha inserida
             
@@ -553,7 +565,7 @@ class EstoqueUI:
                 else:
                     self.clientes_display_area.tag_config(status_tag, foreground="#FF0000")  # Vermelho para excluídos
             
-            row_idx += 1
+            linha_atual += 1
 
     def salvar_e_sair(self):
         self.estoque.salvar_estoque()
