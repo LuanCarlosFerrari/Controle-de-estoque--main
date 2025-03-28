@@ -365,10 +365,18 @@ class EstoqueUI:
             self.display_area.insert("end", "Erro: Código deve ser um número inteiro.\n")
 
     def exibir_estoque(self):
-        # Ocultar a área de texto
-        self.display_area.pack_forget()
+        # Remover todos os widgets da aba de produtos para exibir uma nova visualização
+        for widget in self.produtos_tab.winfo_children():
+            widget.destroy()
 
-        # Criar um frame para a tabela
+        # Primeiro criar os frames de entrada e botões no topo
+        self.setup_produtos_tab()
+        
+        # Agora remover apenas a área de texto (display_area) para colocar a tabela em seu lugar
+        if hasattr(self, 'display_area'):
+            self.display_area.destroy()
+        
+        # Criar um frame para a tabela na parte inferior
         tree_frame = ctk.CTkFrame(self.produtos_tab)
         tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
@@ -418,21 +426,6 @@ class EstoqueUI:
         # Conectar as barras de rolagem
         tree_scroll_y.configure(command=tree.yview)
         tree_scroll_x.configure(command=tree.xview)
-        
-        # Adicionar um botão para voltar à visualização normal
-        voltar_btn = ctk.CTkButton(
-            self.produtos_tab,
-            text="Voltar à visualização normal",
-            command=self.restaurar_display_area
-        )
-        voltar_btn.pack(pady=10)
-        
-        # Armazenar referências para posterior limpeza
-        self.tree_widgets = {
-            "frame": tree_frame,
-            "tree": tree,
-            "voltar_btn": voltar_btn
-        }
 
     def adicionar_cliente(self):
         nome = self.cliente_nome_entry.get()
@@ -563,37 +556,6 @@ class EstoqueUI:
 
     def run(self):
         self.window.mainloop()
-
-    def restaurar_display_area(self):
-        # Remover os widgets da visualização de tabela
-        if hasattr(self, 'tree_widgets'):
-            self.tree_widgets["frame"].destroy()
-            self.tree_widgets["voltar_btn"].destroy()
-            # Limpar a referência
-            self.tree_widgets = None
-        
-        # Restaurar a área de texto
-        self.display_area.pack(padx=20, pady=10, fill="both", expand=True)
-        
-        # Atualizar a exibição de dados
-        self.exibir_dados_estoque()
-        
-    def exibir_dados_estoque(self):
-        # Limpar a área de exibição
-        self.display_area.delete("1.0", "end")
-        
-        # Cabeçalho formatado
-        header = f"{'CÓDIGO':<10} {'NOME':<20} {'PREÇO':<10} {'QUANTIDADE':<10} {'STATUS':<10}\n"
-        self.display_area.insert("end", header)
-        
-        # Linha de separação
-        separator = "-" * 70 + "\n"
-        self.display_area.insert("end", separator)
-        
-        # Exibir dados em formato de texto
-        for codigo, produto in self.estoque.produtos.items():
-            linha = f"{codigo:<10} {produto['nome']:<20} {produto['preco']:<10.2f} {produto['quantidade']:<10} {produto['status']:<10}\n"
-            self.display_area.insert("end", linha)        
 
 if __name__ == "__main__":
     app = EstoqueUI()
