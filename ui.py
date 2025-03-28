@@ -381,6 +381,8 @@ class EstoqueUI:
         # Cabeçalho formatado com espaçamento uniforme - usando texto em negrito manualmente
         header = f"{'CÓDIGO':<10} {'NOME':<20} {'PREÇO (R$)':<15} {'QUANTIDADE':<15} {'STATUS':<10}\n"
         self.display_area.insert("end", header)
+        self.display_area.tag_add("header", "1.0", "2.0")
+        self.display_area.tag_config("header", foreground="#FFFFFF", background="#1F538D")
         
         # Linha de separação
         separator = "-" * 70 + "\n"
@@ -409,11 +411,11 @@ class EstoqueUI:
             # Adicionar tag à linha (do início ao fim da linha atual)
             self.display_area.tag_add(linha_tag, f"{linha_atual}.0", f"{linha_atual+1}.0")
             
-            # Definir cores alternadas para linhas
+            # Definir cores alternadas para linhas - Fundo escuro e letras claras
             if i % 2 == 0:
-                self.display_area.tag_config(linha_tag, background="#EFEFEF")
+                self.display_area.tag_config(linha_tag, foreground="#FFFFFF", background="#2B2B2B")  # Escuro mais claro
             else:
-                self.display_area.tag_config(linha_tag, background="#DFDFDF")
+                self.display_area.tag_config(linha_tag, foreground="#FFFFFF", background="#1E1E1E")  # Escuro mais escuro
             
             # Adicionar tag para colorir o status
             status_tag = f"status_{i}"
@@ -426,9 +428,9 @@ class EstoqueUI:
             
             # Colorir o status
             if dados['status'] == "ativo":
-                self.display_area.tag_config(status_tag, foreground="#008800")  # Verde para ativos
+                self.display_area.tag_config(status_tag, foreground="#77FF77")  # Verde mais brilhante para ativos
             else:
-                self.display_area.tag_config(status_tag, foreground="#FF0000")  # Vermelho para excluídos
+                self.display_area.tag_config(status_tag, foreground="#FF6161")  # Vermelho mais brilhante para excluídos
             
             linha_atual += 1  # Avança para a próxima linha
         
@@ -441,7 +443,7 @@ class EstoqueUI:
         resumo = f"Total de produtos: {total_itens} (Ativos: {ativos}, Excluídos: {excluidos})\n"
         self.display_area.insert("end", resumo)
         self.display_area.tag_add("resumo", f"{float(self.display_area.index('end')) - 1:.1f}", "end")
-        self.display_area.tag_config("resumo", font=("Arial", 10, "bold"))
+        self.display_area.tag_config("resumo", foreground="#FFFFFF")
 
     def adicionar_cliente(self):
         nome = self.cliente_nome_entry.get()
