@@ -99,9 +99,9 @@ class EstoqueUI:
         button_frame.pack(padx=20, pady=10)
 
         ctk.CTkButton(button_frame, text="Adicionar", command=self.adicionar_cliente).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Remover", command=self.remover_cliente).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Atualizar", command=self.atualizar_cliente).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Reativar", command=self.reativar_cliente).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Remover", command=self.habilitar_para_remocao_cliente).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Atualizar", command=self.habilitar_para_atualizacao_cliente).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Reativar", command=self.habilitar_para_reativacao_cliente).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Exibir", command=self.exibir_clientes).pack(side="left", padx=5)
 
         self.clientes_display_area = ctk.CTkTextbox(self.clientes_tab, height=300)
@@ -346,16 +346,14 @@ class EstoqueUI:
         
         # Centralizar o diálogo na janela principal
         # Calcular posição x, y para centralizar
-        window_width = self.window.winfo_width()
-        window_height = self.window.winfo_height()
         window_x = self.window.winfo_x()
         window_y = self.window.winfo_y()
         
         dialog_width = 500
         dialog_height = 300
         
-        position_x = window_x + (window_width - dialog_width) // 2
-        position_y = window_y + (window_height - dialog_height) // 2
+        position_x = window_x + (self.window.winfo_width() - dialog_width) // 2
+        position_y = window_y + (self.window.winfo_height() - dialog_height) // 2
         
         # Definir a geometria com a posição calculada
         dialog.geometry(f"{dialog_width}x{dialog_height}+{position_x}+{position_y}")
@@ -433,13 +431,11 @@ class EstoqueUI:
         self.window.update_idletasks()
         
         # Recalcular posição após o update
-        window_width = self.window.winfo_width()
-        window_height = self.window.winfo_height()
         window_x = self.window.winfo_x()
         window_y = self.window.winfo_y()
         
-        position_x = window_x + (window_width - dialog_width) // 2
-        position_y = window_y + (window_height - dialog_height) // 2
+        position_x = window_x + (self.window.winfo_width() - dialog_width) // 2
+        position_y = window_y + (self.window.winfo_height() - dialog_height) // 2
         
         # Aplicar a geometria atualizada
         dialog.geometry(f"{dialog_width}x{dialog_height}+{position_x}+{position_y}")
@@ -609,69 +605,87 @@ class EstoqueUI:
             self.clientes_display_area.insert("end", "Erro: Código deve ser um número inteiro.\n")
 
     def exibir_clientes(self):
-        self.clientes_display_area.delete("1.0", "end")
-        if not self.clientes.clientes:
-            self.clientes_display_area.insert("end", "Nenhum cliente/mesa cadastrado.\n")
-            return
+        # Remover widgets existentes
+        for widget in self.clientes_tab.winfo_children():
+            widget.destroy()
+
+        # Recriar os frames de entrada e botões
+        self.setup_clientes_tab()
         
-        # Cabeçalho formatado com espaçamento uniforme
-        header = f"{'CÓDIGO':<10} {'NOME':<20} {'MESA/DOC':<15} {'TELEFONE':<15} {'STATUS':<10}\n"
-        self.clientes_display_area.insert("end", header)
-        self.clientes_display_area.tag_add("header", "1.0", "2.0")
-        self.clientes_display_area.tag_config("header", foreground="#FFFFFF", background="#1F538D")
+        # Remover área de texto para colocar a tabela
+        if hasattr(self, 'clientes_display_area'):
+            self.clientes_display_area.destroy()
         
-        # Linha de separação
-        separator = "-" * 70 + "\n"
-        self.clientes_display_area.insert("end", separator)
+        # Frame para a tabela
+        tree_frame = ctk.CTkFrame(self.clientes_tab)
+        tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Preparar dados para exibição
-        clientes_para_exibir = []
-        for codigo, dados in self.clientes.clientes.items():
-            clientes_para_exibir.append((codigo, dados))
+        # Configurar estilo
+        style = ttk.Style()
+        style.configure("Treeview", font=("Arial", 12))
+        style.configure("Treeview.Heading", font=("Arial", 14, "bold"))
         
-        # Ordenar por código para melhor visualização
-        clientes_para_exibir.sort(key=lambda x: x[0])
+        # Criar Treeview com barras de rolagem
+        tree_scroll_y = ttk.Scrollbar(tree_frame, orient="vertical")
+        tree_scroll_y.pack(side="right", fill="y")
         
-        # Preencher com dados
-        linha_atual = 3  # Começa na linha 3 (após cabeçalho e separador)
-        for i, (codigo, dados) in enumerate(clientes_para_exibir):
-            # Criar linha formatada com espaçamento uniforme
-            linha = f"{codigo:<10} {dados['nome']:<20} {dados['mesa']:<15} {dados.get('telefone', 'N/A'):<15} {dados['status']:<10}\n"
-            
-            # Inserir a linha no texto
-            self.clientes_display_area.insert("end", linha)
-            
-            # Tag para colorir a linha inteira
-            linha_tag = f"linha_{i}"
-            
-            # Adicionar tag à linha (do início ao fim da linha atual)
-            self.clientes_display_area.tag_add(linha_tag, f"{linha_atual}.0", f"{linha_atual+1}.0")
-            
-            # Definir cores alternadas para linhas - Fundo escuro e letras claras
-            if i % 2 == 0:
-                self.clientes_display_area.tag_config(linha_tag, foreground="#FFFFFF", background="#2B2B2B")  # Escuro mais claro
-            else:
-                self.clientes_display_area.tag_config(linha_tag, foreground="#FFFFFF", background="#1E1E1E")  # Escuro mais escuro
-            
-            # Adicionar tag para colorir o status
-            status_tag = f"status_{i}"
-            line_count = float(self.clientes_display_area.index("end").split(".")[0])
-            current_line = line_count - 1  # A linha atual é a última linha inserida
-            
-            # Calcular a posição inicial e final do texto do status na linha
-            status_position = linha.rfind(dados['status'])
-            if status_position != -1:
-                start_pos = f"{current_line}.{status_position}"
-                end_pos = f"{current_line}.{status_position + len(dados['status'])}"
-                
-                self.clientes_display_area.tag_add(status_tag, start_pos, end_pos)
-                
-                if dados['status'] == "ativo":
-                    self.clientes_display_area.tag_config(status_tag, foreground="#008800")  # Verde para ativos
-                else:
-                    self.clientes_display_area.tag_config(status_tag, foreground="#FF0000")  # Vermelho para excluídos
-            
-            linha_atual += 1
+        tree_scroll_x = ttk.Scrollbar(tree_frame, orient="horizontal")
+        tree_scroll_x.pack(side="bottom", fill="x")
+        
+        # Criar Treeview com colunas
+        self.clientes_tree = ttk.Treeview(tree_frame, 
+                           columns=("Selecionar", "ID", "Nome", "Documento", "Telefone", "Status"),
+                           show="headings",
+                           yscrollcommand=tree_scroll_y.set,
+                           xscrollcommand=tree_scroll_x.set)
+        
+        # Configurar colunas
+        self.clientes_tree.heading("Selecionar", text="Selecionar")
+        self.clientes_tree.heading("ID", text="ID")
+        self.clientes_tree.heading("Nome", text="Nome")
+        self.clientes_tree.heading("Documento", text="Documento")
+        self.clientes_tree.heading("Telefone", text="Telefone")
+        self.clientes_tree.heading("Status", text="Status")
+        
+        self.clientes_tree.column("Selecionar", width=80, anchor="center")
+        self.clientes_tree.column("ID", width=50)
+        self.clientes_tree.column("Nome", width=150)
+        self.clientes_tree.column("Documento", width=100)
+        self.clientes_tree.column("Telefone", width=100)
+        self.clientes_tree.column("Status", width=100)
+        
+        # Adicionar dados dos clientes
+        self.selected_clientes = {}
+        
+        for cliente_id, cliente_info in self.clientes.clientes.items():
+            item_id = self.clientes_tree.insert("", "end", values=(
+                "",
+                cliente_id,
+                cliente_info["nome"],
+                cliente_info.get("mesa", "N/A"),
+                cliente_info.get("telefone", "N/A"),
+                cliente_info["status"]
+            ))
+            self.selected_clientes[item_id] = {"selected": False, "cliente_id": cliente_id}
+        
+        self.clientes_tree.pack(fill="both", expand=True)
+        
+        # Configurar seleção e barras de rolagem
+        self.clientes_tree.bind("<Button-1>", self.toggle_selection_cliente)
+        tree_scroll_y.configure(command=self.clientes_tree.yview)
+        tree_scroll_x.configure(command=self.clientes_tree.xview)
+        
+        # Atualizar botões para usar seleção
+        for widget in self.clientes_tab.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkButton):
+                        if child.cget("text") == "Remover":
+                            child.configure(command=self.remover_cliente_selecionado)
+                        elif child.cget("text") == "Reativar":
+                            child.configure(command=self.reativar_cliente_selecionado)
+                        elif child.cget("text") == "Atualizar":
+                            child.configure(command=self.atualizar_cliente_selecionado)
 
     def salvar_e_sair(self):
         self.estoque.salvar_estoque()
@@ -754,11 +768,8 @@ class EstoqueUI:
             
             # Criar uma área de texto temporária para manter as mensagens
             mensagens = f"{produtos_reativados} produto(s) reativado(s): {', '.join(map(str, produtos_ids))}\n"
-            
-            # Atualizar a visualização (isso recria todos os widgets, incluindo a área de texto)
             self.exibir_estoque()
             
-            # Após a atualização, mostrar as mensagens na nova área de texto
             if hasattr(self, 'display_area'):
                 self.display_area.insert("end", mensagens)
         else:
@@ -806,6 +817,36 @@ class EstoqueUI:
                     for child in widget.winfo_children():
                         if isinstance(child, ctk.CTkButton) and child.cget("text") == "Atualizar":
                             child.configure(command=self.atualizar_produto)
+
+    def habilitar_para_remocao_cliente(self):
+        self.clientes_display_area.insert("end", "Selecione os clientes na tabela que deseja remover e clique em 'Remover'.\n")
+        
+    def habilitar_para_atualizacao_cliente(self):
+        self.clientes_display_area.insert("end", "Selecione o cliente na tabela que deseja atualizar e clique em 'Atualizar'.\n")
+        
+    def habilitar_para_reativacao_cliente(self):
+        self.clientes_display_area.insert("end", "Selecione os clientes na tabela que deseja reativar e clique em 'Reativar'.\n")
+
+    def toggle_selection_cliente(self, event):
+        region = self.clientes_tree.identify_region(event.x, event.y)
+        if region == "cell":
+            row_id = self.clientes_tree.identify_row(event.y)
+            column = self.clientes_tree.identify_column(event.x)
+            
+            if column == "#1" and row_id:
+                if row_id in self.selected_clientes:
+                    self.selected_clientes[row_id]["selected"] = not self.selected_clientes[row_id]["selected"]
+                    
+                    current_values = self.clientes_tree.item(row_id, "values")
+                    new_values = ("✓" if self.selected_clientes[row_id]["selected"] else "",) + current_values[1:]
+                    
+                    self.clientes_tree.item(row_id, values=new_values)
+                    
+                    if hasattr(self, 'clientes_display_area'):
+                        cliente_id = self.selected_clientes[row_id]["cliente_id"]
+                        status = "selecionado" if self.selected_clientes[row_id]["selected"] else "desmarcado"
+                        self.clientes_display_area.insert("end", f"Cliente com código {cliente_id} {status}.\n")
+
 
 if __name__ == "__main__":
     app = EstoqueUI()
