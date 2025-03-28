@@ -392,40 +392,66 @@ class EstoqueUI:
         tree_scroll_x = ttk.Scrollbar(tree_frame, orient="horizontal")
         tree_scroll_x.pack(side="bottom", fill="x")
         
+        # Adicionar coluna de seleção para a funcionalidade de checkbox
         tree = ttk.Treeview(tree_frame, 
-                           columns=("ID", "Nome", "Preço", "Quantidade", "Status"),
+                           columns=("Selecionar", "ID", "Nome", "Preço", "Quantidade", "Status"),
                            show="headings",
                            yscrollcommand=tree_scroll_y.set,
                            xscrollcommand=tree_scroll_x.set)
         
-        # Configurar as colunas
+        # Configurar as colunas incluindo a nova coluna de seleção
+        tree.heading("Selecionar", text="Selecionar")
         tree.heading("ID", text="ID")
         tree.heading("Nome", text="Nome")
         tree.heading("Preço", text="Preço (R$)")
         tree.heading("Quantidade", text="Quantidade")
         tree.heading("Status", text="Status")
         
+        tree.column("Selecionar", width=80, anchor="center")
         tree.column("ID", width=50)
         tree.column("Nome", width=150)
         tree.column("Preço", width=100)
         tree.column("Quantidade", width=100)
         tree.column("Status", width=100)
         
-        # Adicionar dados do estoque
+        # Adicionar dados do estoque com checkbox
+        self.selected_items = {}  # Dicionário para armazenar o estado dos checkboxes
+        
         for produto_id, produto_info in self.estoque.produtos.items():
-            tree.insert("", "end", values=(
+            item_id = tree.insert("", "end", values=(
+                "",  # Espaço para o checkbox
                 produto_id,
                 produto_info["nome"],
                 f"{produto_info['preco']:.2f}",
                 produto_info["quantidade"],
                 produto_info["status"]
             ))
+            # Armazenar o ID do produto associado ao ID do item na árvore
+            self.selected_items[item_id] = {"selected": False, "produto_id": produto_id}
         
         tree.pack(fill="both", expand=True)
+        
+        # Armazenar referência à árvore para uso em outras funções
+        self.tree = tree
+        
+        # Configurar o evento de clique para alternar a seleção
+        tree.bind("<Button-1>", self.toggle_selection)
         
         # Conectar as barras de rolagem
         tree_scroll_y.configure(command=tree.yview)
         tree_scroll_x.configure(command=tree.xview)
+        
+        # Atualizar os botões para usar a seleção da árvore
+        for widget in self.produtos_tab.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkButton):
+                        if child.cget("text") == "Remover":
+                            child.configure(command=self.remover_produto_selecionado)
+                        elif child.cget("text") == "Reativar":
+                            child.configure(command=self.reativar_produto_selecionado)
+                        elif child.cget("text") == "Atualizar":
+                            child.configure(command=self.preparar_atualizacao_selecionado)
 
     def adicionar_cliente(self):
         nome = self.cliente_nome_entry.get()
@@ -556,6 +582,121 @@ class EstoqueUI:
 
     def run(self):
         self.window.mainloop()
+
+    def toggle_selection(self, event):
+        # Identificar em qual linha o usuário clicou
+        region = self.tree.identify_region(event.x, event.y)
+        if region == "cell":
+            row_id = self.tree.identify_row(event.y)
+            column = self.tree.identify_column(event.x)
+            
+            # Verificar se o clique foi na coluna de seleção (coluna #1)
+            if column == "#1" and row_id:
+                # Inverter o estado de seleção
+                if row_id in self.selected_items:
+                    self.selected_items[row_id]["selected"] = not self.selected_items[row_id]["selected"]
+                    
+                    # Atualizar o marcador visual na interface
+                    current_values = self.tree.item(row_id, "values")
+                    if self.selected_items[row_id]["selected"]:
+                        # Marcar com ✓ se selecionado
+                        new_values = ("✓",) + current_values[1:]
+                    else:
+                        # Remover a marca se não selecionado
+                        new_values = ("",) + current_values[1:]
+                    
+                    # Atualizar os valores na árvore
+                    self.tree.item(row_id, values=new_values)
+                    
+                    # Atualizar mensagem na área de texto
+                    if hasattr(self, 'display_area'):
+                        produto_id = self.selected_items[row_id]["produto_id"]
+                        if self.selected_items[row_id]["selected"]:
+                            self.display_area.insert("end", f"Produto com código {produto_id} selecionado.\n")
+                        else:
+                            self.display_area.insert("end", f"Produto com código {produto_id} desmarcado.\n")
+
+    def remover_produto_selecionado(self):
+        """Remove todos os produtos selecionados na tabela."""
+        produtos_removidos = 0
+        
+        for item_id, dados in self.selected_items.items():
+            if dados["selected"]:
+                produto_id = dados["produto_id"]
+                self.estoque.remover_produto(produto_id)
+                produtos_removidos += 1
+        
+        if produtos_removidos > 0:
+            # Atualizar a mensagem na área de texto
+            self.display_area.insert("end", f"{produtos_removidos} produto(s) marcado(s) como excluído(s).\n")
+            # Salvar as alterações no estoque
+            self.estoque.salvar_estoque()
+            # Atualizar a visualização
+            self.exibir_estoque()
+        else:
+            self.display_area.insert("end", "Nenhum produto selecionado para remoção.\n")
+    
+    def reativar_produto_selecionado(self):
+        """Reativa todos os produtos selecionados na tabela."""
+        produtos_reativados = 0
+        
+        for item_id, dados in self.selected_items.items():
+            if dados["selected"]:
+                produto_id = dados["produto_id"]
+                self.estoque.reativar_produto(produto_id)
+                produtos_reativados += 1
+        
+        if produtos_reativados > 0:
+            # Atualizar a mensagem na área de texto
+            self.display_area.insert("end", f"{produtos_reativados} produto(s) reativado(s).\n")
+            # Salvar as alterações no estoque
+            self.estoque.salvar_estoque()
+            # Atualizar a visualização
+            self.exibir_estoque()
+        else:
+            self.display_area.insert("end", "Nenhum produto selecionado para reativação.\n")
+            
+    def preparar_atualizacao_selecionado(self):
+        """Prepara a atualização do primeiro produto selecionado."""
+        # Verificar se há algum produto selecionado
+        produto_selecionado = None
+        
+        for item_id, dados in self.selected_items.items():
+            if dados["selected"]:
+                produto_selecionado = dados["produto_id"]
+                break
+        
+        if produto_selecionado is None:
+            self.display_area.insert("end", "Nenhum produto selecionado para atualização.\n")
+            return
+        
+        # Carregar os dados do produto nos campos de entrada para edição
+        produto_info = self.estoque.produtos.get(produto_selecionado)
+        if produto_info:
+            # Habilitar e preencher o campo de código
+            self.codigo_entry.configure(state="normal")
+            self.codigo_entry.delete(0, "end")
+            self.codigo_entry.insert(0, str(produto_selecionado))
+            
+            # Preencher os outros campos com os valores atuais do produto
+            self.nome_entry.delete(0, "end")
+            self.nome_entry.insert(0, produto_info["nome"])
+            
+            self.preco_entry.delete(0, "end")
+            self.preco_entry.insert(0, str(produto_info["preco"]))
+            
+            self.produtos_quantidade_entry.delete(0, "end")
+            self.produtos_quantidade_entry.insert(0, str(produto_info["quantidade"]))
+            
+            # Instruções para o usuário
+            self.display_area.insert("end", f"Editando produto com código {produto_selecionado}. Altere os campos desejados e clique em 'Atualizar'.\n")
+            
+            # Redefinir função do botão Atualizar para usar a função padrão de atualização
+            for widget in self.produtos_tab.winfo_children():
+                if isinstance(widget, ctk.CTkFrame):
+                    for child in widget.winfo_children():
+                        if isinstance(child, ctk.CTkButton) and child.cget("text") == "Atualizar":
+                            child.configure(command=self.atualizar_produto)
 
 if __name__ == "__main__":
     app = EstoqueUI()
