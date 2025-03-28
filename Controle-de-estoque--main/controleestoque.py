@@ -1,5 +1,6 @@
 import csv
 import os
+import customtkinter as ctk
 
 vermelho = '\033[31m'
 verde = '\033[32m'
@@ -146,70 +147,113 @@ def atualizar_readme(mensagem):
     except Exception as e:
         print(f"Erro ao atualizar README: {e}")
 
-def menu():
-    print(f"\n {verde} -----Menu de Controle de Estoque-----")
-    print("[1] Adicionar Produto")
-    print("[2] Remover Produto")
-    print("[3] Atualizar Produto")
-    print("[4] Exibir Estoque")
-    print("[5] Sair e Salvar")
-    print("[6] SOBRE")
-    print("  ")
+class EstoqueApp:
+    def __init__(self, root, estoque):
+        self.root = root
+        self.estoque = estoque
+        self.root.title("Controle de Estoque")
+        ctk.set_appearance_mode("System")
+        ctk.set_default_color_theme("blue")
 
-def main():
-    estoque = Estoque()
-    
-    while True:
-        menu()
-        opcao = input(f"{vermelho}SELECT>> \033[2m ")
-        print(f" {branco} ")
-        
-        if opcao == '1':
-            codigo = input("Informe o código do produto: ")
-            nome = input("Informe o nome do produto: ")
-            preco = float(input("Informe o preço do produto: "))
-            quantidade = int(input("Informe a quantidade do produto: "))
-            estoque.adicionar_produto(codigo, nome, preco, quantidade)
+        # Frame principal
+        self.frame = ctk.CTkFrame(self.root)
+        self.frame.pack(pady=20, padx=20)
 
-        elif opcao == '2':
-            codigo = input("Informe o código do produto a ser removido: ")
-            estoque.remover_produto(codigo)
+        # Botões principais lado a lado
+        self.button_frame = ctk.CTkFrame(self.frame)
+        self.button_frame.pack(pady=10)
 
-        elif opcao == '3':
-            codigo = input("Informe o código do produto a ser atualizado: ")
-            nome = input("Novo nome (pressione Enter para manter o atual): ")
-            preco = input("Novo preço (pressione Enter para manter o atual): ")
-            quantidade = input("Nova quantidade (pressione Enter para manter a atual): ")
-            
-            nome = nome if nome else None
+        ctk.CTkButton(self.button_frame, text="Adicionar Produto", command=self.adicionar_produto).pack(side="left", padx=5)
+        ctk.CTkButton(self.button_frame, text="Remover Produto", command=self.remover_produto).pack(side="left", padx=5)
+        ctk.CTkButton(self.button_frame, text="Atualizar Produto", command=self.atualizar_produto).pack(side="left", padx=5)
+        ctk.CTkButton(self.button_frame, text="Exibir Estoque", command=self.exibir_estoque).pack(side="left", padx=5)
+        ctk.CTkButton(self.button_frame, text="Salvar e Sair", command=self.salvar_e_sair).pack(side="left", padx=5)
+
+        # Área de entrada de dados
+        self.input_frame = ctk.CTkFrame(self.frame)
+        self.input_frame.pack(pady=10)
+
+        ctk.CTkLabel(self.input_frame, text="Código:").grid(row=0, column=0, padx=5, pady=5)
+        self.codigo_entry = ctk.CTkEntry(self.input_frame)
+        self.codigo_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        ctk.CTkLabel(self.input_frame, text="Nome:").grid(row=1, column=0, padx=5, pady=5)
+        self.nome_entry = ctk.CTkEntry(self.input_frame)
+        self.nome_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        ctk.CTkLabel(self.input_frame, text="Preço:").grid(row=2, column=0, padx=5, pady=5)
+        self.preco_entry = ctk.CTkEntry(self.input_frame)
+        self.preco_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        ctk.CTkLabel(self.input_frame, text="Quantidade:").grid(row=3, column=0, padx=5, pady=5)
+        self.quantidade_entry = ctk.CTkEntry(self.input_frame)
+        self.quantidade_entry.grid(row=3, column=1, padx=5, pady=5)
+
+        # Área de exibição
+        self.display_area = ctk.CTkTextbox(self.frame, width=600, height=300)
+        self.display_area.pack(pady=10)
+
+    def adicionar_produto(self):
+        codigo = self.codigo_entry.get()
+        nome = self.nome_entry.get()
+        preco = self.preco_entry.get()
+        quantidade = self.quantidade_entry.get()
+
+        if not (codigo and nome and preco and quantidade):
+            self.display_area.insert("end", "Todos os campos devem ser preenchidos para adicionar um produto.\n")
+            return
+
+        try:
+            preco = float(preco)
+            quantidade = int(quantidade)
+            self.estoque.adicionar_produto(codigo, nome, preco, quantidade)
+            self.display_area.insert("end", f"Produto {nome} adicionado com sucesso!\n")
+        except ValueError:
+            self.display_area.insert("end", "Erro: Preço deve ser um número e Quantidade deve ser um inteiro.\n")
+
+    def remover_produto(self):
+        codigo = self.codigo_entry.get()
+
+        if not codigo:
+            self.display_area.insert("end", "O campo Código deve ser preenchido para remover um produto.\n")
+            return
+
+        self.estoque.remover_produto(codigo)
+        self.display_area.insert("end", f"Produto com código {codigo} removido com sucesso!\n")
+
+    def atualizar_produto(self):
+        codigo = self.codigo_entry.get()
+        nome = self.nome_entry.get() or None
+        preco = self.preco_entry.get()
+        quantidade = self.quantidade_entry.get()
+
+        if not codigo:
+            self.display_area.insert("end", "O campo Código deve ser preenchido para atualizar um produto.\n")
+            return
+
+        try:
             preco = float(preco) if preco else None
             quantidade = int(quantidade) if quantidade else None
-            
-            estoque.atualizar_produto(codigo, nome, preco, quantidade)
+            self.estoque.atualizar_produto(codigo, nome, preco, quantidade)
+            self.display_area.insert("end", f"Produto com código {codigo} atualizado com sucesso!\n")
+        except ValueError:
+            self.display_area.insert("end", "Erro: Preço deve ser um número e Quantidade deve ser um inteiro.\n")
 
-        elif opcao == '4':
-            estoque.exibir_estoque()
-
-        elif opcao == '5':
-            estoque.salvar_estoque()
-            print("Saindo e salvando estoque...")
-            atualizar_readme("Sessão encerrada - estoque salvo.")
-            break
-            
-        elif opcao =="6":
-            info = """
-            --- Codado por wan ---
-            --- Python 3           ---
-            --- Pydroid        ---
-            
-            
-            """
-            print(info)
-            atualizar_readme("Informações sobre o sistema visualizadas.")
-
+    def exibir_estoque(self):
+        self.display_area.delete("1.0", "end")
+        if not self.estoque.produtos:
+            self.display_area.insert("end", "Estoque vazio.\n")
         else:
-            print("Opção inválida, tente novamente!")
-            atualizar_readme("Tentativa de opção inválida no menu.")
+            for produto in self.estoque.produtos.values():
+                info = f"Código: {produto.codigo} | Nome: {produto.nome} | Preço: R${produto.preco:.2f} | Quantidade: {produto.quantidade}\n"
+                self.display_area.insert("end", info)
+
+    def salvar_e_sair(self):
+        self.estoque.salvar_estoque()
+        self.root.destroy()
 
 if __name__ == "__main__":
-    main()
+    estoque = Estoque()
+    root = ctk.CTk()
+    app = EstoqueApp(root, estoque)
+    root.mainloop()

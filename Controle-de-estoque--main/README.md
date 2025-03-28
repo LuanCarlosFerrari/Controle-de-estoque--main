@@ -56,3 +56,41 @@ codigo,nome,preco,quantidade
 001,Produto A,10.50,100
 002,Produto B,5.99,50
 003,Produto C,20.00,200
+
+
+## Histórico de Alterações
+
+### 28/03/2025 08:56:55
+- Estoque carregado com sucesso!
+
+### 28/03/2025 08:49:52
+- Estoque carregado com sucesso!
+
+### 28/03/2025 08:49:45
+- Estoque salvo com sucesso!
+
+### 28/03/2025 08:49:12
+- Produto atualizado: código 01
+De: teste (preço: R$2.00, quantidade: 50)
+Para: teste (preço: R$2.00, quantidade: 50)
+
+### 28/03/2025 08:49:08
+- Produto adicionado: teste (código: 01, preço: R$2.00, quantidade: 50)
+
+### 28/03/2025 08:49:02
+- Produto removido: teste (código: 01)
+
+### 28/03/2025 08:48:54
+- Produto adicionado: teste (código: 01, preço: R$2.00, quantidade: 50)
+
+### 28/03/2025 08:48:13
+- Estoque iniciado vazio - arquivo não encontrado.
+
+### 28/03/2025 08:45:43
+- Estoque iniciado vazio - arquivo não encontrado.
+
+### 28/03/2025 08:42:28
+- Estoque iniciado vazio - arquivo não encontrado.
+
+### 28/03/2025 08:41:03
+- Tentativa de opção inválida no menu.
