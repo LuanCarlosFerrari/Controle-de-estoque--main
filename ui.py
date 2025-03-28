@@ -2,6 +2,7 @@ import customtkinter as ctk
 from models.estoque import Estoque
 from models.clientes import Clientes
 import csv
+from tkinter import ttk
 
 class EstoqueUI:
     def __init__(self):
@@ -364,86 +365,74 @@ class EstoqueUI:
             self.display_area.insert("end", "Erro: Código deve ser um número inteiro.\n")
 
     def exibir_estoque(self):
-        self.display_area.delete("1.0", "end")
+        # Ocultar a área de texto
+        self.display_area.pack_forget()
+
+        # Criar um frame para a tabela
+        tree_frame = ctk.CTkFrame(self.produtos_tab)
+        tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Verifica se há produtos no estoque
-        if not self.estoque.produtos:
-            self.display_area.insert("end", "Estoque vazio.\n")
-            return
-            
-        # Exibe mensagem de carregamento
-        self.display_area.insert("end", "Carregando dados do estoque...\n")
-        self.window.update()  # Força atualização da interface
+        # Configurar o estilo do Treeview
+        style = ttk.Style()
+        style.configure("Treeview", font=("Arial", 12))
+        style.configure("Treeview.Heading", font=("Arial", 14, "bold"))
         
-        # Remove a mensagem de carregamento
-        self.display_area.delete("1.0", "end")
+        # Criar o Treeview com barras de rolagem
+        tree_scroll_y = ttk.Scrollbar(tree_frame, orient="vertical")
+        tree_scroll_y.pack(side="right", fill="y")
         
-        # Cabeçalho formatado com espaçamento uniforme - usando texto em negrito manualmente
-        header = f"{'CÓDIGO':<10} {'NOME':<20} {'PREÇO (R$)':<15} {'QUANTIDADE':<15} {'STATUS':<10}\n"
-        self.display_area.insert("end", header)
-        self.display_area.tag_add("header", "1.0", "2.0")
-        self.display_area.tag_config("header", foreground="#FFFFFF", background="#1F538D")
+        tree_scroll_x = ttk.Scrollbar(tree_frame, orient="horizontal")
+        tree_scroll_x.pack(side="bottom", fill="x")
         
-        # Linha de separação
-        separator = "-" * 70 + "\n"
-        self.display_area.insert("end", separator)
+        tree = ttk.Treeview(tree_frame, 
+                           columns=("ID", "Nome", "Preço", "Quantidade", "Status"),
+                           show="headings",
+                           yscrollcommand=tree_scroll_y.set,
+                           xscrollcommand=tree_scroll_x.set)
         
-        # Preparar dados para exibição
-        produtos_para_exibir = []
-        for codigo, dados in self.estoque.produtos.items():
-            produtos_para_exibir.append((codigo, dados))
+        # Configurar as colunas
+        tree.heading("ID", text="ID")
+        tree.heading("Nome", text="Nome")
+        tree.heading("Preço", text="Preço (R$)")
+        tree.heading("Quantidade", text="Quantidade")
+        tree.heading("Status", text="Status")
         
-        # Ordenar por código para melhor visualização
-        produtos_para_exibir.sort(key=lambda x: x[0])
+        tree.column("ID", width=50)
+        tree.column("Nome", width=150)
+        tree.column("Preço", width=100)
+        tree.column("Quantidade", width=100)
+        tree.column("Status", width=100)
         
-        # Preencher com dados
-        linha_atual = 3  # Começa na linha 3 (após cabeçalho e separador)
-        for i, (codigo, dados) in enumerate(produtos_para_exibir):
-            # Criar linha formatada com espaçamento uniforme
-            linha = f"{codigo:<10} {dados['nome']:<20} {dados['preco']:<15.2f} {dados['quantidade']:<15} {dados['status']:<10}\n"
-            
-            # Inserir a linha no texto
-            self.display_area.insert("end", linha)
-            
-            # Tag para colorir a linha inteira
-            linha_tag = f"linha_{i}"
-            
-            # Adicionar tag à linha (do início ao fim da linha atual)
-            self.display_area.tag_add(linha_tag, f"{linha_atual}.0", f"{linha_atual+1}.0")
-            
-            # Definir cores alternadas para linhas - Fundo escuro e letras claras
-            if i % 2 == 0:
-                self.display_area.tag_config(linha_tag, foreground="#FFFFFF", background="#2B2B2B")  # Escuro mais claro
-            else:
-                self.display_area.tag_config(linha_tag, foreground="#FFFFFF", background="#1E1E1E")  # Escuro mais escuro
-            
-            # Adicionar tag para colorir o status
-            status_tag = f"status_{i}"
-            
-            # Calcular posição aproximada do status na linha (próximo ao final)
-            posicao_status = 10 + 20 + 15 + 15 + 1  # Soma das larguras das colunas anteriores
-            
-            # Adicionar tag para o status
-            self.display_area.tag_add(status_tag, f"{linha_atual}.{posicao_status}", f"{linha_atual}.{posicao_status + 10}")
-            
-            # Colorir o status
-            if dados['status'] == "ativo":
-                self.display_area.tag_config(status_tag, foreground="#77FF77")  # Verde mais brilhante para ativos
-            else:
-                self.display_area.tag_config(status_tag, foreground="#FF6161")  # Vermelho mais brilhante para excluídos
-            
-            linha_atual += 1  # Avança para a próxima linha
+        # Adicionar dados do estoque
+        for produto_id, produto_info in self.estoque.produtos.items():
+            tree.insert("", "end", values=(
+                produto_id,
+                produto_info["nome"],
+                f"{produto_info['preco']:.2f}",
+                produto_info["quantidade"],
+                produto_info["status"]
+            ))
         
-        # Exibir um resumo
-        total_itens = len(produtos_para_exibir)
-        ativos = sum(1 for _, dados in produtos_para_exibir if dados['status'] == 'ativo')
-        excluidos = total_itens - ativos
+        tree.pack(fill="both", expand=True)
         
-        self.display_area.insert("end", "\n")
-        resumo = f"Total de produtos: {total_itens} (Ativos: {ativos}, Excluídos: {excluidos})\n"
-        self.display_area.insert("end", resumo)
-        self.display_area.tag_add("resumo", f"{float(self.display_area.index('end')) - 1:.1f}", "end")
-        self.display_area.tag_config("resumo", foreground="#FFFFFF")
+        # Conectar as barras de rolagem
+        tree_scroll_y.configure(command=tree.yview)
+        tree_scroll_x.configure(command=tree.xview)
+        
+        # Adicionar um botão para voltar à visualização normal
+        voltar_btn = ctk.CTkButton(
+            self.produtos_tab,
+            text="Voltar à visualização normal",
+            command=self.restaurar_display_area
+        )
+        voltar_btn.pack(pady=10)
+        
+        # Armazenar referências para posterior limpeza
+        self.tree_widgets = {
+            "frame": tree_frame,
+            "tree": tree,
+            "voltar_btn": voltar_btn
+        }
 
     def adicionar_cliente(self):
         nome = self.cliente_nome_entry.get()
@@ -574,6 +563,37 @@ class EstoqueUI:
 
     def run(self):
         self.window.mainloop()
+
+    def restaurar_display_area(self):
+        # Remover os widgets da visualização de tabela
+        if hasattr(self, 'tree_widgets'):
+            self.tree_widgets["frame"].destroy()
+            self.tree_widgets["voltar_btn"].destroy()
+            # Limpar a referência
+            self.tree_widgets = None
+        
+        # Restaurar a área de texto
+        self.display_area.pack(padx=20, pady=10, fill="both", expand=True)
+        
+        # Atualizar a exibição de dados
+        self.exibir_dados_estoque()
+        
+    def exibir_dados_estoque(self):
+        # Limpar a área de exibição
+        self.display_area.delete("1.0", "end")
+        
+        # Cabeçalho formatado
+        header = f"{'CÓDIGO':<10} {'NOME':<20} {'PREÇO':<10} {'QUANTIDADE':<10} {'STATUS':<10}\n"
+        self.display_area.insert("end", header)
+        
+        # Linha de separação
+        separator = "-" * 70 + "\n"
+        self.display_area.insert("end", separator)
+        
+        # Exibir dados em formato de texto
+        for codigo, produto in self.estoque.produtos.items():
+            linha = f"{codigo:<10} {produto['nome']:<20} {produto['preco']:<10.2f} {produto['quantidade']:<10} {produto['status']:<10}\n"
+            self.display_area.insert("end", linha)        
 
 if __name__ == "__main__":
     app = EstoqueUI()
