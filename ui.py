@@ -34,74 +34,33 @@ class EstoqueUI:
         self.setup_caixa_tab()
         
     def habilitar_para_remocao(self):
-        # Limpar o campo de código e habilitar para inserção
-        self.codigo_entry.configure(state="normal")  # Habilita o campo
-        self.codigo_entry.delete(0, "end")  # Limpa o conteúdo existente
-        self.display_area.insert("end", "Digite o código do produto que deseja remover e clique em 'Remover'.\n")
+        self.display_area.insert("end", "Selecione os produtos na tabela que deseja remover e clique em 'Remover'.\n")
         
-        # Redefinir função do botão Remover
-        for widget in self.produtos_tab.winfo_children():
-            if isinstance(widget, ctk.CTkFrame):
-                for child in widget.winfo_children():
-                    if isinstance(child, ctk.CTkButton) and child.cget("text") == "Remover":
-                        child.configure(command=self.remover_produto)
-                        
     def habilitar_para_atualizacao(self):
-        # Limpar e habilitar campos para atualização
-        self.codigo_entry.configure(state="normal")  # Habilita o campo
-        self.codigo_entry.delete(0, "end")  # Limpa o conteúdo existente
-        self.nome_entry.delete(0, "end")
-        self.preco_entry.delete(0, "end")
-        self.produtos_quantidade_entry.delete(0, "end")
-        self.display_area.insert("end", "Digite o código do produto que deseja atualizar, preencha apenas os campos que deseja modificar e clique em 'Atualizar'.\n")
+        self.display_area.insert("end", "Selecione o produto na tabela que deseja atualizar e clique em 'Atualizar'.\n")
         
-        # Redefinir função do botão Atualizar
-        for widget in self.produtos_tab.winfo_children():
-            if isinstance(widget, ctk.CTkFrame):
-                for child in widget.winfo_children():
-                    if isinstance(child, ctk.CTkButton) and child.cget("text") == "Atualizar":
-                        child.configure(command=self.atualizar_produto)
-                        
     def habilitar_para_reativacao(self):
-        # Limpar o campo de código e habilitar para inserção
-        self.codigo_entry.configure(state="normal")  # Habilita o campo
-        self.codigo_entry.delete(0, "end")  # Limpa o conteúdo existente
-        self.display_area.insert("end", "Digite o código do produto que deseja reativar e clique em 'Reativar'.\n")
-        
-        # Redefinir função do botão Reativar
-        for widget in self.produtos_tab.winfo_children():
-            if isinstance(widget, ctk.CTkFrame):
-                for child in widget.winfo_children():
-                    if isinstance(child, ctk.CTkButton) and child.cget("text") == "Reativar":
-                        child.configure(command=self.reativar_produto)
-    
+        self.display_area.insert("end", "Selecione os produtos na tabela que deseja reativar e clique em 'Reativar'.\n")
+
     def setup_produtos_tab(self):
         # Reutilizar a lógica existente para a aba de produtos
         input_frame = ctk.CTkFrame(self.produtos_tab)
         input_frame.pack(padx=20, pady=10, fill="x")
 
-        input_frame.columnconfigure((0, 1, 2, 3, 4, 5, 6, 7), weight=1)
+        input_frame.columnconfigure((0, 1, 2, 3, 4, 5), weight=1)
 
         # Campos de entrada com labels
-        ctk.CTkLabel(input_frame, text="Código:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        self.codigo_entry = ctk.CTkEntry(input_frame)
-        self.codigo_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        
-        # Adicionar texto de placeholder no campo de código
-        self.codigo_entry.insert(0, "Gerado pelo sistema")
-        self.codigo_entry.configure(state="disabled")  # Desabilita o campo por padrão
-
-        ctk.CTkLabel(input_frame, text="Nome:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+        ctk.CTkLabel(input_frame, text="Nome:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
         self.nome_entry = ctk.CTkEntry(input_frame)
-        self.nome_entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
+        self.nome_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
-        ctk.CTkLabel(input_frame, text="Preço:").grid(row=0, column=4, padx=5, pady=5, sticky="e")
+        ctk.CTkLabel(input_frame, text="Preço:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
         self.preco_entry = ctk.CTkEntry(input_frame)
-        self.preco_entry.grid(row=0, column=5, padx=5, pady=5, sticky="ew")
+        self.preco_entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
 
-        ctk.CTkLabel(input_frame, text="Quantidade:").grid(row=0, column=6, padx=5, pady=5, sticky="e")
+        ctk.CTkLabel(input_frame, text="Quantidade:").grid(row=0, column=4, padx=5, pady=5, sticky="e")
         self.produtos_quantidade_entry = ctk.CTkEntry(input_frame)
-        self.produtos_quantidade_entry.grid(row=0, column=7, padx=5, pady=5, sticky="ew")
+        self.produtos_quantidade_entry.grid(row=0, column=5, padx=5, pady=5, sticky="ew")
 
         button_frame = ctk.CTkFrame(self.produtos_tab)
         button_frame.pack(padx=20, pady=10)
@@ -300,13 +259,7 @@ class EstoqueUI:
         # Adicionar o produto e obter o código
         codigo = self.estoque.adicionar_produto(nome, preco, quantidade)
         
-        # Mostrar o código gerado no campo de código
-        self.codigo_entry.configure(state="normal")
-        self.codigo_entry.delete(0, "end")
-        self.codigo_entry.insert(0, str(codigo))
-        self.codigo_entry.configure(state="disabled")
-        
-        # Limpar os outros campos para facilitar a adição de um novo produto
+        # Limpar os campos para facilitar a adição de um novo produto
         self.nome_entry.delete(0, "end")
         self.preco_entry.delete(0, "end")
         self.produtos_quantidade_entry.delete(0, "end")
@@ -316,6 +269,9 @@ class EstoqueUI:
         
         # Salvar estoque automaticamente após adicionar
         self.estoque.salvar_estoque()
+        
+        # Atualizar a visualização do estoque
+        self.exibir_estoque()
 
     def remover_produto(self):
         codigo = self.codigo_entry.get()
@@ -558,6 +514,7 @@ class EstoqueUI:
         self.selected_items = {}  # Dicionário para armazenar o estado dos checkboxes
         
         for produto_id, produto_info in self.estoque.produtos.items():
+            # Apenas mostrar o produto se estiver ativo
             item_id = tree.insert("", "end", values=(
                 "",  # Espaço para o checkbox
                 produto_id,
@@ -759,7 +716,7 @@ class EstoqueUI:
     def remover_produto_selecionado(self):
         """Remove todos os produtos selecionados na tabela."""
         produtos_removidos = 0
-        produtos_ids = []  # Lista para armazenar todos os IDs dos produtos removidos
+        produtos_ids = []
         
         for item_id, dados in self.selected_items.items():
             if dados["selected"]:
@@ -769,20 +726,13 @@ class EstoqueUI:
                 produtos_ids.append(produto_id)
         
         if produtos_removidos > 0:
-            # Salvar as alterações no estoque
             self.estoque.salvar_estoque()
-            
-            # Criar uma área de texto temporária para manter as mensagens
             mensagens = f"{produtos_removidos} produto(s) marcado(s) como excluído(s): {', '.join(map(str, produtos_ids))}\n"
-            
-            # Atualizar a visualização (isso recria todos os widgets, incluindo a área de texto)
             self.exibir_estoque()
             
-            # Após a atualização, mostrar as mensagens na nova área de texto
             if hasattr(self, 'display_area'):
                 self.display_area.insert("end", mensagens)
         else:
-            # Não é necessário atualizar a visualização se nenhum produto foi removido
             self.display_area.insert("end", "Nenhum produto selecionado para remoção.\n")
 
     def reativar_produto_selecionado(self):
