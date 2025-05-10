@@ -1,0 +1,2 @@
+id,cliente,produto,quantidade,preco_unitario,total,timestamp,status
+1,luan,Coxinha,5,5.0,25.0,2025-05-10 11:49:36,aberto

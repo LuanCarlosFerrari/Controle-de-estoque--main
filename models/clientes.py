@@ -14,24 +14,25 @@ class Clientes:
                 for linha in reader:
                     codigo = int(linha["codigo"])
                     nome = linha["nome"]
-                    telefone = linha["telefone"]
+                    mesa = linha["mesa"]
+                    telefone = linha.get("telefone", "")
                     status = linha["status"]
-                    self.clientes[codigo] = {"nome": nome, "telefone": telefone, "status": status}
+                    self.clientes[codigo] = {"nome": nome, "mesa": mesa, "telefone": telefone, "status": status}
                     self.proximo_codigo = max(self.proximo_codigo, codigo + 1)  # Atualiza o próximo código
         except FileNotFoundError:
             pass
 
     def salvar_clientes(self):
         with open(self.arquivo_csv, mode='w', newline='', encoding='utf-8') as file:
-            fieldnames = ["codigo", "nome", "telefone", "status"]
+            fieldnames = ["codigo", "nome", "mesa", "telefone", "status"]
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
             for codigo, dados in self.clientes.items():
-                writer.writerow({"codigo": codigo, "nome": dados["nome"], "telefone": dados["telefone"], "status": dados["status"]})
+                writer.writerow({"codigo": codigo, "nome": dados["nome"], "mesa": dados["mesa"], "telefone": dados["telefone"], "status": dados["status"]})
 
-    def adicionar_cliente(self, nome, telefone):
+    def adicionar_cliente(self, nome, mesa, telefone=""):
         codigo = self.proximo_codigo
-        self.clientes[codigo] = {"nome": nome, "telefone": telefone, "status": "ativo"}
+        self.clientes[codigo] = {"nome": nome, "mesa": mesa, "telefone": telefone, "status": "ativo"}
         self.proximo_codigo += 1
         return codigo
 
@@ -39,10 +40,12 @@ class Clientes:
         if codigo in self.clientes:
             self.clientes[codigo]["status"] = "excluido"
 
-    def atualizar_cliente(self, codigo, nome=None, telefone=None):
+    def atualizar_cliente(self, codigo, nome=None, mesa=None, telefone=None):
         if codigo in self.clientes and self.clientes[codigo]["status"] == "ativo":
             if nome:
                 self.clientes[codigo]["nome"] = nome
+            if mesa:
+                self.clientes[codigo]["mesa"] = mesa
             if telefone:
                 self.clientes[codigo]["telefone"] = telefone
 
