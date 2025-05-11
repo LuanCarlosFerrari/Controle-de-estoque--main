@@ -1,6 +1,8 @@
 import customtkinter as ctk
 from models.estoque import Estoque
 from models.clientes import Clientes
+from views.produtos_view import ProdutosView
+from controllers.produtos_controller import ProdutosController
 import csv
 from datetime import datetime
 
@@ -28,12 +30,21 @@ class EstoqueUI:
         self.caixa_tab = self.tabview.add("Caixa")
 
         # Configurar cada aba
-        self.setup_produtos_tab()
+        # self.setup_produtos_tab() # Will be replaced by MVC instantiation
         self.setup_clientes_tab()
         self.setup_consumo_tab()
         self.setup_caixa_tab()
+        self.setup_produtos_tab_mvc() # New method to setup Produtos tab with MVC
         self.update_consumo_comboboxes() # Initial population for Consumo tab
         self.update_caixa_cliente_combobox() # Initial population for Caixa tab
+
+    def setup_produtos_tab_mvc(self):
+        # Instantiate the View and Controller for the Produtos tab
+        self.produtos_view = ProdutosView(self.produtos_tab, None) # Controller will be set after its instantiation
+        self.produtos_controller = ProdutosController(self.estoque, self.produtos_view, self)
+        self.produtos_view.controller = self.produtos_controller # Set the controller in the view
+        self.produtos_view.set_button_commands() # Now set the button commands
+        self.produtos_controller.exibir_estoque() # Initial display
 
     def update_caixa_cliente_combobox(self):
         # Clientes com contas que não estão totalmente pagas (abertas ou parcialmente pagas)
@@ -65,48 +76,8 @@ class EstoqueUI:
             self.produto_combobox.configure(values=["Nenhum produto ativo"])
             self.produto_combobox.set("Nenhum produto ativo")
 
-    def setup_produtos_tab(self):
-        # Reutilizar a lógica existente para a aba de produtos
-        input_frame = ctk.CTkFrame(self.produtos_tab)
-        input_frame.pack(padx=20, pady=10, fill="x")
-
-        input_frame.columnconfigure((0, 1, 2, 3, 4, 5, 6, 7), weight=1)
-
-        ctk.CTkLabel(input_frame, text="Código:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        self.codigo_entry = ctk.CTkEntry(input_frame)
-        self.codigo_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-
-        ctk.CTkLabel(input_frame, text="Nome:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
-        self.nome_entry = ctk.CTkEntry(input_frame)
-        self.nome_entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
-
-        ctk.CTkLabel(input_frame, text="Preço:").grid(row=0, column=4, padx=5, pady=5, sticky="e")
-        self.preco_entry = ctk.CTkEntry(input_frame)
-        self.preco_entry.grid(row=0, column=5, padx=5, pady=5, sticky="ew")
-
-        ctk.CTkLabel(input_frame, text="Quantidade:").grid(row=0, column=6, padx=5, pady=5, sticky="e")
-        self.produto_quantidade_entry = ctk.CTkEntry(input_frame)
-        self.produto_quantidade_entry.grid(row=0, column=7, padx=5, pady=5, sticky="ew")
-
-        button_frame = ctk.CTkFrame(self.produtos_tab)
-        button_frame.pack(padx=20, pady=10)
-
-        ctk.CTkButton(button_frame, text="Adicionar", command=self.adicionar_produto).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Remover", command=self.remover_produto).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Atualizar", command=self.atualizar_produto).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Reativar", command=self.reativar_produto).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Exibir Estoque", command=self.exibir_estoque).pack(side="left", padx=5)
-
-        # Label for status messages
-        self.product_status_label = ctk.CTkLabel(self.produtos_tab, text="", height=1, anchor="w")
-        self.product_status_label.pack(padx=20, pady=(5, 0), fill="x")
-
-        # Frame for the products table
-        self.products_table_frame = ctk.CTkScrollableFrame(self.produtos_tab, height=300)
-        self.products_table_frame.pack(padx=20, pady=10, fill="both", expand=True)
-        
-        # Initial call to display headers or empty state
-        self.exibir_estoque() 
+    # def setup_produtos_tab(self): -- This method is now handled by ProdutosView and ProdutosController
+    # All related methods (adicionar_produto, remover_produto, etc.) are also removed from EstoqueUI.
 
     def setup_clientes_tab(self):
         # Configuração inicial para a aba de clientes/mesa
@@ -453,7 +424,8 @@ class EstoqueUI:
                     self.consumo_quantidade_entry.delete(0, "end") # Clear quantity entry
                     self.update_consumo_comboboxes() 
                     self.update_caixa_cliente_combobox() 
-                    self.exibir_estoque() # Refresh product stock display if visible
+                    if hasattr(self, 'produtos_controller'): # Refresh product stock display if MVC is setup
+                        self.produtos_controller.exibir_estoque()
                     self.exibir_consumos() # Refresh consumos table
                 else:
                     self.consumo_status_label.configure(text=f"Erro: Quantidade em estoque insuficiente para {produto}.")
@@ -509,179 +481,8 @@ class EstoqueUI:
                 row_num += 1
             self.consumo_status_label.configure(text=f"{len(self.consumos_registrados)} consumos exibidos.")
 
-    def adicionar_produto(self):
-        nome = self.nome_entry.get().strip()
-        preco_str = self.preco_entry.get().strip()
-        quantidade_str = self.produto_quantidade_entry.get().strip()
-
-        if not nome:
-            self.product_status_label.configure(text="Erro: O campo Nome está vazio.")
-            return
-        if not preco_str:
-            self.product_status_label.configure(text="Erro: O campo Preço está vazio.")
-            return
-        if not quantidade_str:
-            self.product_status_label.configure(text="Erro: O campo Quantidade está vazio.")
-            return
-
-        try:
-            preco = float(preco_str.replace(',', '.'))
-        except ValueError:
-            self.product_status_label.configure(text="Erro: Preço deve ser um número válido.")
-            return
-
-        try:
-            quantidade = int(quantidade_str)
-        except ValueError:
-            self.product_status_label.configure(text="Erro: Quantidade deve ser um número inteiro válido.")
-            return
-
-        codigo = self.estoque.adicionar_produto(nome, preco, quantidade)
-        self.product_status_label.configure(text=f"Produto {nome} adicionado com sucesso! Código: {codigo}")
-        self.update_consumo_comboboxes()
-        self.exibir_estoque() # Refresh table
-
-    def remover_produto(self):
-        codigo_str = self.codigo_entry.get().strip()
-
-        if not codigo_str:
-            self.product_status_label.configure(text="O campo Código deve ser preenchido para remover um produto.")
-            return
-
-        try:
-            codigo = int(codigo_str)
-            self.estoque.remover_produto(codigo)
-            self.product_status_label.configure(text=f"Produto com código {codigo} marcado como excluído.")
-            self.update_consumo_comboboxes()
-            self.exibir_estoque() # Refresh table
-        except ValueError:
-            self.product_status_label.configure(text="Erro: Código deve ser um número inteiro.")
-
-    def atualizar_produto(self):
-        codigo_str = self.codigo_entry.get().strip()
-        nome = self.nome_entry.get().strip() or None # Use strip here as well
-        preco_str = self.preco_entry.get().strip()
-        # Assuming self.quantidade_entry was a typo and it's self.produto_quantidade_entry for products tab
-        quantidade_str = self.produto_quantidade_entry.get().strip()
-
-
-        if not codigo_str:
-            self.product_status_label.configure(text="O campo Código deve ser preenchido para atualizar um produto.")
-            return
-
-        try:
-            codigo = int(codigo_str)
-            preco = None
-            if preco_str:
-                preco = float(preco_str.replace(',', '.'))
-            
-            quantidade = None
-            if quantidade_str:
-                quantidade = int(quantidade_str)
-                
-            self.estoque.atualizar_produto(codigo, nome, preco, quantidade)
-            self.product_status_label.configure(text=f"Produto com código {codigo} atualizado com sucesso!")
-            self.update_consumo_comboboxes() # if product name/price changes
-            self.exibir_estoque() # Refresh table
-        except ValueError:
-            self.product_status_label.configure(text="Erro: Código deve ser int, Preço float, Quantidade int.")
-
-    def reativar_produto(self):
-        codigo_str = self.codigo_entry.get().strip()
-
-        if not codigo_str:
-            self.product_status_label.configure(text="O campo Código deve ser preenchido para reativar um produto.")
-            return
-
-        try:
-            codigo = int(codigo_str)
-            self.estoque.reativar_produto(codigo)
-            self.product_status_label.configure(text=f"Produto com código {codigo} reativado com sucesso!")
-            self.update_consumo_comboboxes()
-            self.exibir_estoque() # Refresh table
-        except ValueError:
-            self.product_status_label.configure(text="Erro: Código deve ser um número inteiro.")
-
-    def exibir_estoque(self):
-        # Clear previous widgets in the frame
-        for widget in self.products_table_frame.winfo_children():
-            widget.destroy()
-
-        # Define headers - "Ativo" (checkbox) is now the first column
-        headers = ["Ativo", "Código", "Nome", "Preço (R$)", "Quantidade"]
-        column_widths = [0.1, 0.1, 0.3, 0.15, 0.15] # Adjusted for "Ativo" first
-
-        for col, header_text in enumerate(headers):
-            header_label = ctk.CTkLabel(self.products_table_frame, text=header_text, font=ctk.CTkFont(weight="bold"), anchor="center")
-            header_label.grid(row=0, column=col, padx=5, pady=5, sticky="nsew")
-        
-        # Configure column weights for the frame's grid
-        for i, weight in enumerate(column_widths):
-             self.products_table_frame.grid_columnconfigure(i, weight=int(weight*100)) # Use integer weights
-
-
-        if not self.estoque.produtos:
-            no_data_label = ctk.CTkLabel(self.products_table_frame, text="Estoque vazio.")
-            no_data_label.grid(row=1, column=0, columnspan=len(headers), padx=5, pady=10, sticky="nsew")
-            self.product_status_label.configure(text="Estoque vazio.")
-        else:
-            row_num = 1
-            # Sort products by code (assuming codes are integers or can be directly compared)
-            # Given the AttributeError, codes are likely integers.
-            sorted_codigos = sorted(self.estoque.produtos.keys())
-
-            for codigo in sorted_codigos:
-                dados = self.estoque.produtos[codigo]
-                
-                # Column 0: Checkbox for status
-                status_checkbox = ctk.CTkCheckBox(
-                    self.products_table_frame,
-                    text="", 
-                    onvalue="ativo", offvalue="excluido",
-                    command=lambda c=codigo: self.toggle_produto_status(c)
-                )
-                if dados['status'] == 'ativo':
-                    status_checkbox.select()
-                else:
-                    status_checkbox.deselect()
-                status_checkbox.grid(row=row_num, column=0, padx=5, pady=2, sticky="nsew")
-
-                # Subsequent columns for other data
-                data_to_display = [
-                    codigo,
-                    dados['nome'],
-                    f"{dados['preco']:.2f}",
-                    dados['quantidade']
-                ]
-                for i, item_data in enumerate(data_to_display):
-                    item_label = ctk.CTkLabel(self.products_table_frame, text=str(item_data), anchor="center")
-                    # Start data columns from grid column 1
-                    item_label.grid(row=row_num, column=i + 1, padx=5, pady=2, sticky="nsew")
-                
-                row_num += 1
-            if row_num == 1: 
-                self.product_status_label.configure(text="Estoque carregado.") 
-            else:
-                 self.product_status_label.configure(text=f"{len(self.estoque.produtos)} produtos exibidos.")
-
-    def toggle_produto_status(self, product_code):
-        produto = self.estoque.produtos.get(str(product_code)) # Ensure code is string if keys are strings
-        if not produto:
-            produto = self.estoque.produtos.get(int(product_code)) # Try int if not found as string
-        
-        if not produto:
-            self.product_status_label.configure(text=f"Erro: Produto com código {product_code} não encontrado.")
-            return
-
-        if produto['status'] == 'ativo':
-            self.estoque.remover_produto(product_code) # remover_produto handles the status change
-            self.product_status_label.configure(text=f"Produto {product_code} marcado como inativo.")
-        else: # 'excluido'
-            self.estoque.reativar_produto(product_code) # reativar_produto handles the status change
-            self.product_status_label.configure(text=f"Produto {product_code} reativado.")
-        
-        self.exibir_estoque() # Refresh the table
-        self.update_consumo_comboboxes() # Update other UI elements that depend on product status
+    # Methods related to Produtos tab (adicionar_produto, remover_produto, atualizar_produto, reativar_produto, exibir_estoque, toggle_produto_status)
+    # have been moved to ProdutosController and ProdutosView.
 
     def adicionar_cliente(self):
         nome = self.cliente_nome_entry.get().strip()
