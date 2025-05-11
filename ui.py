@@ -36,16 +36,17 @@ class EstoqueUI:
         self.update_caixa_cliente_combobox() # Initial population for Caixa tab
 
     def update_caixa_cliente_combobox(self):
-        clientes_com_contas_abertas = sorted(list(set(c["cliente"] for c in self.consumos_registrados if c["status"] == "aberto")))
-        if clientes_com_contas_abertas:
-            self.caixa_cliente_combobox.configure(values=clientes_com_contas_abertas)
-            self.caixa_cliente_combobox.set(clientes_com_contas_abertas[0])
+        # Clientes com contas que não estão totalmente pagas (abertas ou parcialmente pagas)
+        clientes_com_contas_pendentes = sorted(list(set(c["cliente"] for c in self.consumos_registrados if c["status"] != "pago")))
+        if clientes_com_contas_pendentes:
+            self.caixa_cliente_combobox.configure(values=clientes_com_contas_pendentes)
+            self.caixa_cliente_combobox.set(clientes_com_contas_pendentes[0])
             self.display_conta_cliente() # Display items for the first client
         else:
-            self.caixa_cliente_combobox.configure(values=["Nenhum cliente com conta aberta"])
-            self.caixa_cliente_combobox.set("Nenhum cliente com conta aberta")
+            self.caixa_cliente_combobox.configure(values=["Nenhum cliente com conta pendente"])
+            self.caixa_cliente_combobox.set("Nenhum cliente com conta pendente")
             self.caixa_display_area.delete("1.0", "end")
-            self.caixa_display_area.insert("end", "Nenhum consumo em aberto para exibir.\n")
+            self.caixa_display_area.insert("end", "Nenhum consumo pendente para exibir.\n")
 
     def update_consumo_comboboxes(self):
         active_client_names = [c["nome"] for c in self.clientes.clientes.values() if c["status"] == "ativo"]
@@ -170,138 +171,178 @@ class EstoqueUI:
 
         self.caixa_display_area.delete("1.0", "end")
 
-        if selected_client == "Nenhum cliente com conta aberta" or not selected_client: # Check stripped name
-            self.caixa_display_area.insert("end", "Nenhum cliente selecionado ou sem contas abertas.\n")
+        if selected_client == "Nenhum cliente com conta aberta" or selected_client == "Nenhum cliente com conta pendente" or not selected_client: # Check stripped name
+            self.caixa_display_area.insert("end", "Nenhum cliente selecionado ou sem contas pendentes.\n")
             return
 
-        consumos_cliente_aberto = [
+        # Coleta consumos que não estão totalmente pagos ('aberto' ou 'parcialmente_pago')
+        consumos_cliente_nao_pagos = [
             c for c in self.consumos_registrados 
-            if c["cliente"] == selected_client and c["status"] == "aberto"
+            if c["cliente"] == selected_client and c.get("status", "aberto") != "pago"
         ]
+        # Ordenar por timestamp para consistência na exibição e processamento
+        consumos_cliente_nao_pagos.sort(key=lambda x: x.get("timestamp", ""))
 
-        if not consumos_cliente_aberto:
-            self.caixa_display_area.insert("end", f"Nenhuma conta aberta para o cliente: {selected_client}\n")
+        if not consumos_cliente_nao_pagos:
+            self.caixa_display_area.insert("end", f"Nenhuma conta pendente (aberta ou parcialmente paga) para o cliente: {selected_client}\n")
             return
 
-        self.caixa_display_area.insert("end", f"--- Conta Aberta: {selected_client} ---\n")
-        total_conta = 0
-        for consumo in consumos_cliente_aberto:
-            info = (f"ID: {consumo['id']}, Produto: {consumo['produto']}, Qtd: {consumo['quantidade']}, "
-                    f"Preço Unit.: R${consumo['preco_unitario']:.2f}, Total Item: R${consumo['total']:.2f}\n"
-                    f"  Data: {consumo['timestamp']}\n")
+        self.caixa_display_area.insert("end", f"--- Conta de: {selected_client} ---\n")
+        total_geral_devido_na_conta = 0.0
+        for consumo in consumos_cliente_nao_pagos:
+            valor_total_item = consumo.get('total', 0.0)
+            valor_pago_neste_item = consumo.get("valor_pago_item", 0.0)
+            valor_restante_neste_item = valor_total_item - valor_pago_neste_item
+            total_geral_devido_na_conta += valor_restante_neste_item
+
+            info = (f"ID: {consumo.get('id', 'N/A')}, Produto: {consumo.get('produto', 'N/A')}, Qtd: {consumo.get('quantidade', 0)}\n"
+                    f"  Total Original do Item: R${valor_total_item:.2f}\n"
+                    f"  Valor Pago neste Item: R${valor_pago_neste_item:.2f}\n"
+                    f"  Valor Restante neste Item: R${valor_restante_neste_item:.2f}\n"
+                    f"  Data: {consumo.get('timestamp', 'N/A')}, Status: {consumo.get('status', 'N/A').upper()}\n"
+                    f"-----------------------------------\n")
             self.caixa_display_area.insert("end", info)
-            total_conta += consumo['total']
         
-        self.caixa_display_area.insert("end", "-----------------------------------\n")
-        self.caixa_display_area.insert("end", "-----------------------------------\n")
-        self.caixa_display_area.insert("end", f"TOTAL DA CONTA ABERTA: R${total_conta:.2f}\n")
-        self.caixa_display_area.insert("end", "-----------------------------------\n")
-        return total_conta # Return the calculated total
+        self.caixa_display_area.insert("end", f"TOTAL DEVIDO NA CONTA: R${total_geral_devido_na_conta:.2f}\n")
+        self.caixa_display_area.insert("end", "===================================\n")
+        return total_geral_devido_na_conta # Retorna o total devido calculado
 
     def realizar_pagamento_caixa(self):
         selected_client_raw = self.caixa_cliente_combobox.get()
-        if not selected_client_raw: # Handle empty selection if possible
+        if not selected_client_raw or selected_client_raw == "Nenhum cliente com conta pendente":
             self.caixa_display_area.delete("1.0", "end")
-            self.caixa_display_area.insert("end", "ERRO: Nenhum cliente selecionado.\n")
+            self.caixa_display_area.insert("end", "ERRO: Nenhum cliente com conta pendente selecionado.\n")
             return
         selected_client = selected_client_raw.strip()
         
         valor_pago_str = self.caixa_valor_pago_entry.get()
         
-        self.caixa_display_area.delete("1.0", "end") # Clear display area at the beginning
-
-        if selected_client == "Nenhum cliente com conta aberta": # Check after strip
-            self.caixa_display_area.insert("end", "ERRO: Nenhum cliente selecionado.\n")
-            return
+        # Limpar a área de exibição no início da função para novas mensagens.
+        # self.caixa_display_area.delete("1.0", "end") # Movido para depois da validação do valor pago
 
         if not valor_pago_str:
-            self.caixa_display_area.insert("end", "ERRO: Informe o valor a pagar.\n")
+            # Não limpar a tela ainda, apenas adicionar mensagem de erro se o valor não for informado
+            # para que o usuário veja o erro no contexto da conta atual.
+            current_text = self.caixa_display_area.get("1.0", "end-1c") # Salva o texto atual
+            self.caixa_display_area.delete("1.0", "end")
+            self.caixa_display_area.insert("end", current_text + "\nERRO: Informe o valor a pagar.\n")
             return
 
         try:
             valor_pago_informado = float(valor_pago_str.replace(',', '.'))
-            if valor_pago_informado <= 0:
-                self.caixa_display_area.insert("end", "\nERRO: Valor a pagar deve ser positivo.\n")
+            if valor_pago_informado <= 0.001: # Permitir pagamentos muito pequenos se necessário, mas geralmente > 0
+                current_text = self.caixa_display_area.get("1.0", "end-1c")
+                self.caixa_display_area.delete("1.0", "end")
+                self.caixa_display_area.insert("end", current_text + "\nERRO: Valor a pagar deve ser positivo.\n")
                 return
         except ValueError:
-            self.caixa_display_area.insert("end", "\nERRO: Valor a pagar inválido.\n")
+            current_text = self.caixa_display_area.get("1.0", "end-1c")
+            self.caixa_display_area.delete("1.0", "end")
+            self.caixa_display_area.insert("end", current_text + "\nERRO: Valor a pagar inválido.\n")
             return
 
-        # Coletar IDs e totais dos itens abertos para o cliente, mantendo a ordem original de self.consumos_registrados
-        # para depois poder ordená-los por timestamp e ainda assim encontrar o índice correto em self.consumos_registrados
-        
-        itens_abertos_do_cliente_para_pagar = []
+        # Agora que as entradas são válidas, limpar a área para o resumo do pagamento e a conta atualizada.
+        self.caixa_display_area.delete("1.0", "end")
+
+        # Coletar itens que estão 'aberto' ou 'parcialmente_pago'
+        itens_a_processar_pagamento = []
         for i, c in enumerate(self.consumos_registrados):
-            if c["cliente"] == selected_client and c["status"] == "aberto":
-                itens_abertos_do_cliente_para_pagar.append({
+            # Usar .get("status", "aberto") para retrocompatibilidade se status não existir
+            if c["cliente"] == selected_client and c.get("status", "aberto") != "pago":
+                itens_a_processar_pagamento.append({
                     "id": c["id"],
-                    "total": c["total"],
-                    "timestamp": c["timestamp"],
-                    "original_index": i # Guardar o índice original em self.consumos_registrados
+                    "total_original_item": c["total"],
+                    "valor_ja_pago_item": c.get("valor_pago_item", 0.0),
+                    "timestamp": c.get("timestamp", ""), # Lidar com possível ausência de timestamp
+                    "original_index": i 
                 })
 
-        # Ordenar os itens a pagar pelo timestamp
-        itens_abertos_do_cliente_para_pagar.sort(key=lambda x: x["timestamp"])
+        itens_a_processar_pagamento.sort(key=lambda x: x["timestamp"])
 
-        if not itens_abertos_do_cliente_para_pagar:
-            self.caixa_display_area.insert("end", f"INFO: Nenhuma conta aberta para {selected_client}.\n")
+        if not itens_a_processar_pagamento:
+            self.caixa_display_area.insert("end", f"INFO: Nenhuma conta pendente para {selected_client} para aplicar pagamento.\n")
+            # Mesmo sem itens, mostrar o "pagamento" como não utilizado se um valor foi informado
+            if valor_pago_informado > 0:
+                 self.caixa_display_area.insert("end", f"Valor informado de R${valor_pago_informado:.2f} não foi utilizado.\n")
+            self.caixa_valor_pago_entry.delete(0, "end")
+            self.update_caixa_cliente_combobox()
+            self.update_consumo_comboboxes()
             return
             
-        valor_restante_do_pagamento = valor_pago_informado
-        total_baixado_nesta_operacao = 0
-        itens_pagos_nesta_operacao = 0
-        ids_consumos_pagos_log = []
+        valor_disponivel_para_pagar = valor_pago_informado
+        total_efetivamente_pago_nesta_operacao = 0.0
+        itens_afetados_nesta_operacao_log = []
 
-        for item_a_pagar in itens_abertos_do_cliente_para_pagar:
-            if valor_restante_do_pagamento >= item_a_pagar['total']:
-                # Modificar o item original em self.consumos_registrados usando o índice guardado
-                original_idx = item_a_pagar['original_index']
-                if self.consumos_registrados[original_idx]['id'] == item_a_pagar['id'] and self.consumos_registrados[original_idx]['status'] == 'aberto':
-                    self.consumos_registrados[original_idx]['status'] = "pago"
-                    ids_consumos_pagos_log.append(item_a_pagar['id'])
-                    total_baixado_nesta_operacao += item_a_pagar['total']
-                    valor_restante_do_pagamento -= item_a_pagar['total']
-                    itens_pagos_nesta_operacao += 1
-                else:
-                    # Algo deu errado, o item no índice original não é o esperado ou já foi pago
-                    # Isso não deveria acontecer com esta lógica, mas é uma salvaguarda
-                    print(f"DEBUG: Discrepância ao tentar pagar item ID {item_a_pagar['id']}")
-                    continue 
-            else:
-                # Não pode pagar este item integralmente
-                break 
-        
-        # Mensagens sobre o pagamento
-        if itens_pagos_nesta_operacao > 0:
-            self.caixa_display_area.insert("end", f"--- Pagamento Processado para {selected_client} ---\n")
-            self.caixa_display_area.insert("end", f"Valor Informado: R${valor_pago_informado:.2f}\n")
-            self.caixa_display_area.insert("end", f"Total Baixado da Conta: R${total_baixado_nesta_operacao:.2f}\n")
-            if valor_restante_do_pagamento > 0:
-                 self.caixa_display_area.insert("end", f"Valor Restante do Pagamento (Troco/Não Utilizado): R${valor_restante_do_pagamento:.2f}\n")
-            self.caixa_display_area.insert("end", f"Itens Pagos (IDs): {', '.join(map(str, ids_consumos_pagos_log))}\n")
-            self.caixa_display_area.insert("end", "-----------------------------------\n\n")
-        else:
-            self.caixa_display_area.insert("end", f"Nenhum item integralmente pago para {selected_client} com o valor de R${valor_pago_informado:.2f}.\n")
-            if valor_restante_do_pagamento == valor_pago_informado : 
-                 self.caixa_display_area.insert("end", f"O valor R${valor_pago_informado:.2f} não foi suficiente para quitar nenhum item.\n")
-        
+        for item_em_processamento in itens_a_processar_pagamento:
+            if valor_disponivel_para_pagar < 0.01: # Se não há mais dinheiro significativo para aplicar
+                break
+
+            original_idx = item_em_processamento['original_index']
+            consumo_original_ref = self.consumos_registrados[original_idx]
+
+            if consumo_original_ref['id'] != item_em_processamento['id'] or consumo_original_ref.get('status','aberto') == 'pago':
+                print(f"DEBUG: Discrepância ou item já pago ao tentar processar item ID {item_em_processamento['id']}")
+                continue
+
+            valor_devido_neste_item = consumo_original_ref['total'] - consumo_original_ref.get('valor_pago_item', 0.0)
+            
+            # Arredondar para evitar problemas com float
+            valor_devido_neste_item = round(valor_devido_neste_item, 2)
+
+            if valor_devido_neste_item <= 0:
+                continue # Item já está (ou deveria estar) pago, pular
+
+            valor_a_aplicar_neste_item = 0.0
+            if valor_disponivel_para_pagar >= valor_devido_neste_item:
+                valor_a_aplicar_neste_item = valor_devido_neste_item
+                consumo_original_ref['valor_pago_item'] = round(consumo_original_ref.get('valor_pago_item', 0.0) + valor_a_aplicar_neste_item, 2)
+                # Verificar se o item está totalmente pago após a aplicação
+                if round(consumo_original_ref['total'] - consumo_original_ref['valor_pago_item'], 2) < 0.01:
+                    consumo_original_ref['status'] = "pago"
+                    consumo_original_ref['valor_pago_item'] = consumo_original_ref['total'] # Garante exatidão
+                else: # Isso não deveria acontecer se valor_disponivel >= valor_devido
+                    consumo_original_ref['status'] = "parcialmente_pago" 
+            else: # Pagamento é menor que o devido no item, aplica o que resta do pagamento
+                valor_a_aplicar_neste_item = valor_disponivel_para_pagar
+                consumo_original_ref['valor_pago_item'] = round(consumo_original_ref.get('valor_pago_item', 0.0) + valor_a_aplicar_neste_item, 2)
+                consumo_original_ref['status'] = "parcialmente_pago"
+            
+            consumo_original_ref['valor_pago_item'] = round(consumo_original_ref['valor_pago_item'], 2)
+            total_efetivamente_pago_nesta_operacao += valor_a_aplicar_neste_item
+            total_efetivamente_pago_nesta_operacao = round(total_efetivamente_pago_nesta_operacao, 2)
+            valor_disponivel_para_pagar -= valor_a_aplicar_neste_item
+            valor_disponivel_para_pagar = round(valor_disponivel_para_pagar, 2)
+            
+            itens_afetados_nesta_operacao_log.append(
+                f"ID {consumo_original_ref['id']} (R${valor_a_aplicar_neste_item:.2f} aplicados, Novo Status: {consumo_original_ref['status'].upper()})"
+            )
+
+        # --- Exibição do resumo e atualização da UI ---
         self.caixa_valor_pago_entry.delete(0, "end")
-
-        # Atualizar a exibição da conta do cliente (mostrando itens restantes em aberto)
-        # Esta chamada é crucial e deve usar o selected_client que teve o pagamento processado.
-        # As mensagens de resumo do pagamento já foram inseridas antes desta chamada.
-        # Esta chamada irá REESCREVER a caixa de texto com a lista atualizada de itens abertos.
         
-        # Adicionar as mensagens de resumo do pagamento ANTES de mostrar a lista de itens restantes.
-        # (Esta parte foi movida para ser ANTES da chamada a display_conta_cliente)
-        # ... [mensagens de resumo do pagamento] ... (já estão lá)
+        # Chamar display_conta_cliente PRIMEIRO para limpar e mostrar o estado atualizado da conta
+        self.display_conta_cliente(client_name_to_display=selected_client) 
 
-        # Agora, display_conta_cliente é chamado para mostrar o estado atual da conta.
-        self.display_conta_cliente(client_name_to_display=selected_client)
+        # DEPOIS, anexar o resumo do pagamento que acabou de ser processado
+        summary_message = f"\n--- Resumo do Pagamento para {selected_client} ---\n"
+        summary_message += f"Valor Informado para Pagamento: R${valor_pago_informado:.2f}\n"
+        summary_message += f"Total Efetivamente Aplicado nesta Operação: R${total_efetivamente_pago_nesta_operacao:.2f}\n"
+
+        if valor_disponivel_para_pagar > 0.001: # Se houver troco/valor não utilizado significativo
+            summary_message += f"Valor Restante do Pagamento (Troco/Não Utilizado): R${valor_disponivel_para_pagar:.2f}\n"
         
-        # E então, atualizamos a combobox, que pode re-selecionar e chamar display_conta_cliente novamente.
+        if itens_afetados_nesta_operacao_log:
+            summary_message += "Itens Afetados:\n"
+            for log_entry in itens_afetados_nesta_operacao_log:
+                summary_message += f"  - {log_entry}\n"
+        elif valor_pago_informado > 0: # Se um pagamento foi informado mas nada foi afetado
+            summary_message += "Nenhum item foi afetado por este pagamento (valor pode ter sido insuficiente ou já não há itens pendentes).\n"
+        
+        summary_message += "===================================\n"
+        self.caixa_display_area.insert("end", summary_message) # Anexa o resumo
+        
         self.update_caixa_cliente_combobox() 
-        self.update_consumo_comboboxes() # Atualiza comboboxes da aba Consumo também
+        self.update_consumo_comboboxes()
 
     def setup_consumo_tab(self):
         # Configuração inicial para a aba de consumo
@@ -370,7 +411,8 @@ class EstoqueUI:
                         "preco_unitario": produto_dados["preco"],
                         "total": total,
                         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "status": "aberto"  # 'aberto' ou 'pago'
+                        "status": "aberto",  # 'aberto', 'parcialmente_pago', 'pago'
+                        "valor_pago_item": 0.0 # Novo campo para rastrear o valor pago por este item
                     }
                     self.consumos_registrados.append(consumo_info)
                     
@@ -589,7 +631,8 @@ class EstoqueUI:
                             "preco_unitario": float(linha["preco_unitario"]),
                             "total": float(linha["total"]),
                             "timestamp": linha["timestamp"],
-                            "status": linha["status"]
+                            "status": linha["status"],
+                            "valor_pago_item": float(linha.get("valor_pago_item", 0.0)) # Carrega o novo campo, com padrão 0.0 se não existir
                         }
                         self.consumos_registrados.append(consumo)
                     except ValueError as e:
@@ -616,10 +659,10 @@ class EstoqueUI:
             with open(arquivo_csv, mode='w', newline='', encoding='utf-8') as file:
                 if not self.consumos_registrados: # Não escreve nada se não há consumos (nem cabeçalho)
                     # Ou pode optar por escrever apenas o cabeçalho se o arquivo deve existir
-                    # file.write("id,cliente,produto,quantidade,preco_unitario,total,timestamp,status\n")
+                    # file.write("id,cliente,produto,quantidade,preco_unitario,total,timestamp,status,valor_pago_item\n")
                     return
 
-                fieldnames = ["id", "cliente", "produto", "quantidade", "preco_unitario", "total", "timestamp", "status"]
+                fieldnames = ["id", "cliente", "produto", "quantidade", "preco_unitario", "total", "timestamp", "status", "valor_pago_item"]
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
                 writer.writeheader()
                 for consumo in self.consumos_registrados:
