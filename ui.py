@@ -137,8 +137,16 @@ class EstoqueUI:
         ctk.CTkButton(button_frame, text="Reativar", command=self.reativar_cliente).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Exibir", command=self.exibir_clientes).pack(side="left", padx=5)
 
-        self.clientes_display_area = ctk.CTkTextbox(self.clientes_tab, height=300)
-        self.clientes_display_area.pack(padx=20, pady=10, fill="both", expand=True)
+        # Label for status messages in Clientes tab
+        self.client_status_label = ctk.CTkLabel(self.clientes_tab, text="", height=1, anchor="w")
+        self.client_status_label.pack(padx=20, pady=(5, 0), fill="x")
+
+        # Frame for the clients table
+        self.clients_table_frame = ctk.CTkScrollableFrame(self.clientes_tab, height=300)
+        self.clients_table_frame.pack(padx=20, pady=10, fill="both", expand=True)
+
+        # Initial call to display headers or empty state
+        self.exibir_clientes()
 
     def setup_estoque_tab(self):
         # Removida a configuração da aba de estoque
@@ -379,20 +387,34 @@ class EstoqueUI:
         ctk.CTkButton(button_frame, text="Remover Consumo", command=self.remover_consumo).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Exibir Consumos", command=self.exibir_consumos).pack(side="left", padx=5)
 
-        self.consumo_display_area = ctk.CTkTextbox(self.consumo_tab, height=300)
-        self.consumo_display_area.pack(padx=20, pady=10, fill="both", expand=True)
+        # Label for status messages in Consumo tab
+        self.consumo_status_label = ctk.CTkLabel(self.consumo_tab, text="", height=1, anchor="w")
+        self.consumo_status_label.pack(padx=20, pady=(5,0), fill="x")
+
+        # Frame for the consumos table
+        self.consumos_table_frame = ctk.CTkScrollableFrame(self.consumo_tab, height=300)
+        self.consumos_table_frame.pack(padx=20, pady=10, fill="both", expand=True)
+        
+        self.exibir_consumos() # Initial display
 
     def registrar_consumo(self):
         cliente = self.cliente_combobox.get()
         produto = self.produto_combobox.get()
-        quantidade = self.consumo_quantidade_entry.get()
+        cliente = self.cliente_combobox.get()
+        produto = self.produto_combobox.get()
+        quantidade_str = self.consumo_quantidade_entry.get().strip()
 
-        if not (cliente and produto and quantidade):
-            self.consumo_display_area.insert("end", "Todos os campos devem ser preenchidos para registrar um consumo.\n")
+        if not (cliente and cliente != "Nenhum cliente ativo" and 
+                produto and produto != "Nenhum produto ativo" and 
+                quantidade_str):
+            self.consumo_status_label.configure(text="Todos os campos (Cliente, Produto, Quantidade) devem ser preenchidos.")
             return
 
         try:
-            quantidade = int(quantidade)
+            quantidade = int(quantidade_str)
+            if quantidade <= 0:
+                self.consumo_status_label.configure(text="Erro: Quantidade deve ser um número positivo.")
+                return
             produto_dados = next((p for p in self.estoque.produtos.values() if p["nome"] == produto), None)
             cliente_dados = next((c for c in self.clientes.clientes.values() if c["nome"] == cliente), None)
 
@@ -427,34 +449,65 @@ class EstoqueUI:
                     # Deduzir do estoque
                     self.estoque.produtos[produto_codigo]["quantidade"] -= quantidade
                     
-                    self.consumo_display_area.insert("end", f"Consumo registrado: Cliente {cliente}, Produto {produto}, Qtd: {quantidade}, Total R${total:.2f}\n")
+                    self.consumo_status_label.configure(text=f"Consumo: {cliente}, {produto}, Qtd: {quantidade}, Total R${total:.2f}")
+                    self.consumo_quantidade_entry.delete(0, "end") # Clear quantity entry
                     self.update_consumo_comboboxes() 
-                    self.update_caixa_cliente_combobox() # Atualizar caixa se novo cliente tem conta
-                    self.exibir_estoque() 
+                    self.update_caixa_cliente_combobox() 
+                    self.exibir_estoque() # Refresh product stock display if visible
+                    self.exibir_consumos() # Refresh consumos table
                 else:
-                    self.consumo_display_area.insert("end", f"Erro: Quantidade em estoque insuficiente para {produto}.\n")
+                    self.consumo_status_label.configure(text=f"Erro: Quantidade em estoque insuficiente para {produto}.")
             else:
-                self.consumo_display_area.insert("end", "Erro ao registrar consumo: Cliente ou Produto não encontrado.\n")
+                self.consumo_status_label.configure(text="Erro: Cliente ou Produto não encontrado/ativo.")
         except ValueError:
-            self.consumo_display_area.insert("end", "Erro: Quantidade deve ser um número inteiro.\n")
+            self.consumo_status_label.configure(text="Erro: Quantidade deve ser um número inteiro.")
 
     def remover_consumo(self):
-        self.consumo_display_area.insert("end", "Funcionalidade de remoção de consumo ainda não implementada.\n")
+        # Esta funcionalidade precisa de uma forma de identificar qual consumo remover (e.g., por ID)
+        # e lógica para reverter o débito do estoque, etc.
+        self.consumo_status_label.configure(text="Funcionalidade de remoção de consumo ainda não implementada.")
 
     def exibir_consumos(self):
-        self.consumo_display_area.delete("1.0", "end")
+        for widget in self.consumos_table_frame.winfo_children():
+            widget.destroy()
+
+        headers = ["ID", "Cliente", "Produto", "Qtd", "Preço Unit.", "Total Item", "Data/Hora", "Status", "Pago"]
+        # Define relative column widths
+        column_widths = [0.05, 0.15, 0.15, 0.05, 0.1, 0.1, 0.2, 0.1, 0.1]
+
+        for col, header_text in enumerate(headers):
+            header_label = ctk.CTkLabel(self.consumos_table_frame, text=header_text, font=ctk.CTkFont(weight="bold"), anchor="center")
+            header_label.grid(row=0, column=col, padx=5, pady=5, sticky="nsew")
+
+        for i, weight in enumerate(column_widths):
+            self.consumos_table_frame.grid_columnconfigure(i, weight=int(weight * 100))
+        
         if not self.consumos_registrados:
-            self.consumo_display_area.insert("end", "Nenhum consumo registrado.\n")
+            no_data_label = ctk.CTkLabel(self.consumos_table_frame, text="Nenhum consumo registrado.")
+            no_data_label.grid(row=1, column=0, columnspan=len(headers), padx=5, pady=10, sticky="nsew")
+            self.consumo_status_label.configure(text="Nenhum consumo registrado.")
         else:
-            self.consumo_display_area.insert("end", "--- Lista de Consumos Registrados ---\n")
-            # Ordenar por timestamp para consistência, talvez mais recentes primeiro
-            for consumo in sorted(self.consumos_registrados, key=lambda x: x.get('timestamp', ''), reverse=True):
-                info = (f"ID: {consumo.get('id', 'N/A')}, Cliente: {consumo['cliente']}, Produto: {consumo['produto']}, "
-                        f"Qtd: {consumo['quantidade']}, Preço Unit.: R${consumo['preco_unitario']:.2f}, "
-                        f"Total: R${consumo['total']:.2f}, Data: {consumo.get('timestamp', 'N/A')}, "
-                        f"Status: {consumo.get('status', 'N/A')}\n")
-                self.consumo_display_area.insert("end", info)
-            self.consumo_display_area.insert("end", "-----------------------------------\n")
+            row_num = 1
+            # Sort by timestamp, most recent first
+            sorted_consumos = sorted(self.consumos_registrados, key=lambda x: x.get('timestamp', ''), reverse=True)
+            
+            for consumo in sorted_consumos:
+                data_to_display = [
+                    consumo.get('id', 'N/A'),
+                    consumo.get('cliente', 'N/A'),
+                    consumo.get('produto', 'N/A'),
+                    consumo.get('quantidade', 0),
+                    f"{consumo.get('preco_unitario', 0.0):.2f}",
+                    f"{consumo.get('total', 0.0):.2f}",
+                    consumo.get('timestamp', 'N/A'),
+                    consumo.get('status', 'N/A').upper(),
+                    f"{consumo.get('valor_pago_item', 0.0):.2f}"
+                ]
+                for col, item_data in enumerate(data_to_display):
+                    item_label = ctk.CTkLabel(self.consumos_table_frame, text=str(item_data), anchor="center")
+                    item_label.grid(row=row_num, column=col, padx=5, pady=2, sticky="nsew")
+                row_num += 1
+            self.consumo_status_label.configure(text=f"{len(self.consumos_registrados)} consumos exibidos.")
 
     def adicionar_produto(self):
         nome = self.nome_entry.get().strip()
@@ -597,74 +650,155 @@ class EstoqueUI:
 
 
     def adicionar_cliente(self):
-        nome = self.cliente_nome_entry.get().strip() # Adicionado .strip()
+        nome = self.cliente_nome_entry.get().strip()
         documento = self.documento_entry.get().strip()
         telefone = self.telefone_entry.get().strip()
 
-        if not (nome and documento): # 'nome' já está stripado
-            self.clientes_display_area.insert("end", "Os campos Nome e Documento são obrigatórios para adicionar um cliente/mesa.\n")
+        if not (nome and documento):
+            self.client_status_label.configure(text="Os campos Nome e Documento são obrigatórios.")
             return
 
         codigo = self.clientes.adicionar_cliente(nome, documento, telefone)
-        self.clientes_display_area.insert("end", f"Cliente/Mesa {nome} adicionado com sucesso! Código: {codigo}\n")
+        self.client_status_label.configure(text=f"Cliente/Mesa {nome} adicionado! Código: {codigo}")
         self.update_consumo_comboboxes()
+        self.update_caixa_cliente_combobox() # Clientes might now have open accounts
+        self.exibir_clientes()
 
     def remover_cliente(self):
-        codigo = self.cliente_nome_entry.get()
+        # Assuming codigo for removal is identified by Nome do Cliente/Mesa entry for now
+        # This might need adjustment if a dedicated "Código do Cliente" entry is preferred for operations
+        nome_cliente_para_remover = self.cliente_nome_entry.get().strip() 
+        if not nome_cliente_para_remover:
+            self.client_status_label.configure(text="Nome do Cliente/Mesa deve ser preenchido para remover.")
+            return
 
-        if not codigo:
-            self.clientes_display_area.insert("end", "O campo Código deve ser preenchido para remover um cliente.\n")
+        # Find client code by name - this is a simplification.
+        # A more robust system would use a dedicated code entry or selection from the table.
+        client_code_to_remove = None
+        for code, data in self.clientes.clientes.items():
+            if data["nome"] == nome_cliente_para_remover:
+                client_code_to_remove = code
+                break
+        
+        if client_code_to_remove is None:
+            self.client_status_label.configure(text=f"Cliente/Mesa '{nome_cliente_para_remover}' não encontrado.")
             return
 
         try:
-            codigo = int(codigo)
-            self.clientes.remover_cliente(codigo)
-            self.clientes_display_area.insert("end", f"Cliente com código {codigo} marcado como excluído.\n")
+            # The self.clientes.remover_cliente likely expects an integer code
+            self.clientes.remover_cliente(int(client_code_to_remove)) 
+            self.client_status_label.configure(text=f"Cliente/Mesa cód. {client_code_to_remove} marcado como excluído.")
             self.update_consumo_comboboxes()
-        except ValueError:
-            self.clientes_display_area.insert("end", "Erro: Código deve ser um número inteiro.\n")
+            self.update_caixa_cliente_combobox()
+            self.exibir_clientes()
+        except ValueError: # Should not happen if client_code_to_remove is from keys
+            self.client_status_label.configure(text="Erro: Código do cliente inválido para remoção.")
+        except Exception as e:
+            self.client_status_label.configure(text=f"Erro ao remover cliente: {e}")
+
 
     def atualizar_cliente(self):
-        codigo = self.cliente_nome_entry.get()
-        nome = self.cliente_nome_entry.get() or None
-        documento = self.documento_entry.get() or None
-        telefone = self.telefone_entry.get() or None
+        # Similar to remover_cliente, identifying client by name from entry for update is a simplification.
+        nome_cliente_para_atualizar = self.cliente_nome_entry.get().strip()
+        novo_documento = self.documento_entry.get().strip() or None
+        novo_telefone = self.telefone_entry.get().strip() or None
 
-        if not codigo:
-            self.clientes_display_area.insert("end", "O campo Código deve ser preenchido para atualizar um cliente/mesa.\n")
+        if not nome_cliente_para_atualizar:
+            self.client_status_label.configure(text="Nome do Cliente/Mesa deve ser preenchido para atualizar.")
+            return
+
+        client_code_to_update = None
+        current_nome = None
+        for code, data in self.clientes.clientes.items():
+            if data["nome"] == nome_cliente_para_atualizar:
+                client_code_to_update = code
+                current_nome = data["nome"] # Keep current name if not changing via a dedicated field
+                break
+        
+        if client_code_to_update is None:
+            self.client_status_label.configure(text=f"Cliente/Mesa '{nome_cliente_para_atualizar}' não encontrado.")
             return
 
         try:
-            codigo = int(codigo)
-            self.clientes.atualizar_cliente(codigo, nome, documento, telefone)
-            self.clientes_display_area.insert("end", f"Cliente/Mesa com código {codigo} atualizado com sucesso!\n")
+            # Pass current_nome as 'nome' if not changing, or a new name if a field for it existed
+            self.clientes.atualizar_cliente(int(client_code_to_update), current_nome, novo_documento, novo_telefone)
+            self.client_status_label.configure(text=f"Cliente/Mesa cód. {client_code_to_update} atualizado.")
+            self.update_consumo_comboboxes() # Name might change
+            self.update_caixa_cliente_combobox() # Name might change
+            self.exibir_clientes()
         except ValueError:
-            self.clientes_display_area.insert("end", "Erro: Código deve ser um número inteiro.\n")
+            self.client_status_label.configure(text="Erro: Código do cliente inválido para atualização.")
+        except Exception as e:
+            self.client_status_label.configure(text=f"Erro ao atualizar cliente: {e}")
 
     def reativar_cliente(self):
-        codigo = self.cliente_nome_entry.get()
-
-        if not codigo:
-            self.clientes_display_area.insert("end", "O campo Código deve ser preenchido para reativar um cliente.\n")
+        nome_cliente_para_reativar = self.cliente_nome_entry.get().strip()
+        if not nome_cliente_para_reativar:
+            self.client_status_label.configure(text="Nome do Cliente/Mesa deve ser preenchido para reativar.")
             return
 
+        client_code_to_reativate = None
+        for code, data in self.clientes.clientes.items():
+            if data["nome"] == nome_cliente_para_reativar:
+                client_code_to_reativate = code
+                break
+        
+        if client_code_to_reativate is None:
+            self.client_status_label.configure(text=f"Cliente/Mesa '{nome_cliente_para_reativar}' não encontrado.")
+            return
+            
         try:
-            codigo = int(codigo)
-            self.clientes.reativar_cliente(codigo)
-            self.clientes_display_area.insert("end", f"Cliente com código {codigo} reativado com sucesso!\n")
+            self.clientes.reativar_cliente(int(client_code_to_reativate))
+            self.client_status_label.configure(text=f"Cliente/Mesa cód. {client_code_to_reativate} reativado.")
             self.update_consumo_comboboxes()
+            self.update_caixa_cliente_combobox()
+            self.exibir_clientes()
         except ValueError:
-            self.clientes_display_area.insert("end", "Erro: Código deve ser um número inteiro.\n")
+            self.client_status_label.configure(text="Erro: Código do cliente inválido para reativação.")
+        except Exception as e:
+            self.client_status_label.configure(text=f"Erro ao reativar cliente: {e}")
 
     def exibir_clientes(self):
-        self.clientes_display_area.delete("1.0", "end")
-        if not self.clientes.clientes:
-            self.clientes_display_area.insert("end", "Nenhum cliente/mesa cadastrado.\n")
-        else:
-            for codigo, dados in self.clientes.clientes.items():
-                info = f"Código: {codigo} | Nome: {dados['nome']} | Documento: {dados['mesa']} | Telefone: {dados.get('telefone', 'N/A')} | Status: {dados['status']}\n"
-                self.clientes_display_area.insert("end", info)
+        for widget in self.clients_table_frame.winfo_children():
+            widget.destroy()
 
+        headers = ["Código", "Nome", "Documento/Mesa", "Telefone", "Status"]
+        # Adjust column widths as needed
+        column_widths = [0.1, 0.3, 0.25, 0.2, 0.15] 
+
+        for col, header_text in enumerate(headers):
+            header_label = ctk.CTkLabel(self.clients_table_frame, text=header_text, font=ctk.CTkFont(weight="bold"), anchor="center")
+            header_label.grid(row=0, column=col, padx=5, pady=5, sticky="nsew")
+        
+        for i, weight in enumerate(column_widths):
+             self.clients_table_frame.grid_columnconfigure(i, weight=int(weight*100))
+
+        if not self.clientes.clientes:
+            no_data_label = ctk.CTkLabel(self.clients_table_frame, text="Nenhum cliente/mesa cadastrado.")
+            no_data_label.grid(row=1, column=0, columnspan=len(headers), padx=5, pady=10, sticky="nsew")
+            self.client_status_label.configure(text="Nenhum cliente/mesa cadastrado.")
+        else:
+            row_num = 1
+            # Assuming client codes are sortable (e.g., integers or numeric strings)
+            sorted_codigos = sorted(self.clientes.clientes.keys(), key=lambda x: int(x) if str(x).isdigit() else str(x))
+
+
+            for codigo in sorted_codigos:
+                dados = self.clientes.clientes[codigo]
+                # 'mesa' is used for documento in Clientes model based on previous context
+                data_to_display = [
+                    codigo,
+                    dados.get('nome', 'N/A'),
+                    dados.get('mesa', 'N/A'), # 'mesa' field seems to hold Documento
+                    dados.get('telefone', 'N/A'),
+                    dados.get('status', 'N/A')
+                ]
+                for col, item_data in enumerate(data_to_display):
+                    item_label = ctk.CTkLabel(self.clients_table_frame, text=str(item_data), anchor="center")
+                    item_label.grid(row=row_num, column=col, padx=5, pady=2, sticky="nsew")
+                row_num += 1
+            self.client_status_label.configure(text=f"{len(self.clientes.clientes)} clientes/mesas exibidos.")
+            
     def salvar_e_sair(self):
         self.estoque.salvar_estoque()
         self.clientes.salvar_clientes()
