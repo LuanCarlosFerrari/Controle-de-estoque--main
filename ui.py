@@ -97,8 +97,16 @@ class EstoqueUI:
         ctk.CTkButton(button_frame, text="Reativar", command=self.reativar_produto).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Exibir Estoque", command=self.exibir_estoque).pack(side="left", padx=5)
 
-        self.display_area = ctk.CTkTextbox(self.produtos_tab, height=300)
-        self.display_area.pack(padx=20, pady=10, fill="both", expand=True)
+        # Label for status messages
+        self.product_status_label = ctk.CTkLabel(self.produtos_tab, text="", height=1, anchor="w")
+        self.product_status_label.pack(padx=20, pady=(5, 0), fill="x")
+
+        # Frame for the products table
+        self.products_table_frame = ctk.CTkScrollableFrame(self.produtos_tab, height=300)
+        self.products_table_frame.pack(padx=20, pady=10, fill="both", expand=True)
+        
+        # Initial call to display headers or empty state
+        self.exibir_estoque() 
 
     def setup_clientes_tab(self):
         # Configuração inicial para a aba de clientes/mesa
@@ -450,97 +458,143 @@ class EstoqueUI:
 
     def adicionar_produto(self):
         nome = self.nome_entry.get().strip()
-        preco = self.preco_entry.get().strip()
-        quantidade = self.produto_quantidade_entry.get().strip()
+        preco_str = self.preco_entry.get().strip()
+        quantidade_str = self.produto_quantidade_entry.get().strip()
 
-        # Depuração: Exibir valores capturados
-        self.display_area.insert("end", f"Depuração: Nome='{nome}', Preço='{preco}', Quantidade='{quantidade}'\n")
-
-        # Verificar se todos os campos estão preenchidos
         if not nome:
-            self.display_area.insert("end", "Erro: O campo Nome está vazio.\n")
+            self.product_status_label.configure(text="Erro: O campo Nome está vazio.")
             return
-        if not preco:
-            self.display_area.insert("end", "Erro: O campo Preço está vazio.\n")
+        if not preco_str:
+            self.product_status_label.configure(text="Erro: O campo Preço está vazio.")
             return
-        if not quantidade:
-            self.display_area.insert("end", "Erro: O campo Quantidade está vazio.\n")
-            return
-
-        try:
-            preco = float(preco.replace(',', '.'))
-        except ValueError:
-            self.display_area.insert("end", "Erro: Preço deve ser um número válido.\n")
+        if not quantidade_str:
+            self.product_status_label.configure(text="Erro: O campo Quantidade está vazio.")
             return
 
         try:
-            quantidade = int(quantidade)
+            preco = float(preco_str.replace(',', '.'))
         except ValueError:
-            self.display_area.insert("end", "Erro: Quantidade deve ser um número inteiro válido.\n")
+            self.product_status_label.configure(text="Erro: Preço deve ser um número válido.")
+            return
+
+        try:
+            quantidade = int(quantidade_str)
+        except ValueError:
+            self.product_status_label.configure(text="Erro: Quantidade deve ser um número inteiro válido.")
             return
 
         codigo = self.estoque.adicionar_produto(nome, preco, quantidade)
-        self.display_area.insert("end", f"Produto {nome} adicionado com sucesso! Código: {codigo}\n")
+        self.product_status_label.configure(text=f"Produto {nome} adicionado com sucesso! Código: {codigo}")
         self.update_consumo_comboboxes()
+        self.exibir_estoque() # Refresh table
 
     def remover_produto(self):
-        codigo = self.codigo_entry.get()
+        codigo_str = self.codigo_entry.get().strip()
 
-        if not codigo:
-            self.display_area.insert("end", "O campo Código deve ser preenchido para remover um produto.\n")
+        if not codigo_str:
+            self.product_status_label.configure(text="O campo Código deve ser preenchido para remover um produto.")
             return
 
         try:
-            codigo = int(codigo)
+            codigo = int(codigo_str)
             self.estoque.remover_produto(codigo)
-            self.display_area.insert("end", f"Produto com código {codigo} marcado como excluído.\n")
+            self.product_status_label.configure(text=f"Produto com código {codigo} marcado como excluído.")
             self.update_consumo_comboboxes()
+            self.exibir_estoque() # Refresh table
         except ValueError:
-            self.display_area.insert("end", "Erro: Código deve ser um número inteiro.\n")
+            self.product_status_label.configure(text="Erro: Código deve ser um número inteiro.")
 
     def atualizar_produto(self):
-        codigo = self.codigo_entry.get()
-        nome = self.nome_entry.get() or None
-        preco = self.preco_entry.get()
-        quantidade = self.quantidade_entry.get()
+        codigo_str = self.codigo_entry.get().strip()
+        nome = self.nome_entry.get().strip() or None # Use strip here as well
+        preco_str = self.preco_entry.get().strip()
+        # Assuming self.quantidade_entry was a typo and it's self.produto_quantidade_entry for products tab
+        quantidade_str = self.produto_quantidade_entry.get().strip()
 
-        if not codigo:
-            self.display_area.insert("end", "O campo Código deve ser preenchido para atualizar um produto.\n")
+
+        if not codigo_str:
+            self.product_status_label.configure(text="O campo Código deve ser preenchido para atualizar um produto.")
             return
 
         try:
-            codigo = int(codigo)
-            if preco: # Se o preço foi fornecido para atualização
-                preco = float(preco.replace(',', '.'))
-            quantidade = int(quantidade) if quantidade else None
+            codigo = int(codigo_str)
+            preco = None
+            if preco_str:
+                preco = float(preco_str.replace(',', '.'))
+            
+            quantidade = None
+            if quantidade_str:
+                quantidade = int(quantidade_str)
+                
             self.estoque.atualizar_produto(codigo, nome, preco, quantidade)
-            self.display_area.insert("end", f"Produto com código {codigo} atualizado com sucesso!\n")
+            self.product_status_label.configure(text=f"Produto com código {codigo} atualizado com sucesso!")
+            self.update_consumo_comboboxes() # if product name/price changes
+            self.exibir_estoque() # Refresh table
         except ValueError:
-            self.display_area.insert("end", "Erro: Código deve ser um número inteiro, Preço (ex: 10.50) deve ser um número e Quantidade deve ser um inteiro.\n")
+            self.product_status_label.configure(text="Erro: Código deve ser int, Preço float, Quantidade int.")
 
     def reativar_produto(self):
-        codigo = self.codigo_entry.get()
+        codigo_str = self.codigo_entry.get().strip()
 
-        if not codigo:
-            self.display_area.insert("end", "O campo Código deve ser preenchido para reativar um produto.\n")
+        if not codigo_str:
+            self.product_status_label.configure(text="O campo Código deve ser preenchido para reativar um produto.")
             return
 
         try:
-            codigo = int(codigo)
+            codigo = int(codigo_str)
             self.estoque.reativar_produto(codigo)
-            self.display_area.insert("end", f"Produto com código {codigo} reativado com sucesso!\n")
+            self.product_status_label.configure(text=f"Produto com código {codigo} reativado com sucesso!")
             self.update_consumo_comboboxes()
+            self.exibir_estoque() # Refresh table
         except ValueError:
-            self.display_area.insert("end", "Erro: Código deve ser um número inteiro.\n")
+            self.product_status_label.configure(text="Erro: Código deve ser um número inteiro.")
 
     def exibir_estoque(self):
-        self.display_area.delete("1.0", "end")
+        # Clear previous widgets in the frame
+        for widget in self.products_table_frame.winfo_children():
+            widget.destroy()
+
+        # Define headers
+        headers = ["Código", "Nome", "Preço (R$)", "Quantidade", "Status"]
+        column_widths = [0.1, 0.3, 0.15, 0.15, 0.2] # Relative widths
+
+        for col, header_text in enumerate(headers):
+            header_label = ctk.CTkLabel(self.products_table_frame, text=header_text, font=ctk.CTkFont(weight="bold"), anchor="center")
+            header_label.grid(row=0, column=col, padx=5, pady=5, sticky="nsew")
+        
+        # Configure column weights for the frame's grid
+        for i, weight in enumerate(column_widths):
+             self.products_table_frame.grid_columnconfigure(i, weight=int(weight*100)) # Use integer weights
+
+
         if not self.estoque.produtos:
-            self.display_area.insert("end", "Estoque vazio.\n")
+            no_data_label = ctk.CTkLabel(self.products_table_frame, text="Estoque vazio.")
+            no_data_label.grid(row=1, column=0, columnspan=len(headers), padx=5, pady=10, sticky="nsew")
+            self.product_status_label.configure(text="Estoque vazio.")
         else:
-            for codigo, dados in self.estoque.produtos.items():
-                info = f"Código: {codigo} | Nome: {dados['nome']} | Preço: R${dados['preco']:.2f} | Quantidade: {dados['quantidade']} | Status: {dados['status']}\n"
-                self.display_area.insert("end", info)
+            row_num = 1
+            # Sort products by code (assuming codes are integers or can be directly compared)
+            # Given the AttributeError, codes are likely integers.
+            sorted_codigos = sorted(self.estoque.produtos.keys())
+
+            for codigo in sorted_codigos:
+                dados = self.estoque.produtos[codigo]
+                data_to_display = [
+                    codigo,
+                    dados['nome'],
+                    f"{dados['preco']:.2f}",
+                    dados['quantidade'],
+                    dados['status']
+                ]
+                for col, item_data in enumerate(data_to_display):
+                    item_label = ctk.CTkLabel(self.products_table_frame, text=str(item_data), anchor="center")
+                    item_label.grid(row=row_num, column=col, padx=5, pady=2, sticky="nsew")
+                row_num += 1
+            if row_num == 1: # Should be caught by `if not self.estoque.produtos` but as a fallback
+                self.product_status_label.configure(text="Estoque carregado.") # Or some other neutral message
+            else:
+                 self.product_status_label.configure(text=f"{len(self.estoque.produtos)} produtos exibidos.")
+
 
     def adicionar_cliente(self):
         nome = self.cliente_nome_entry.get().strip() # Adicionado .strip()
