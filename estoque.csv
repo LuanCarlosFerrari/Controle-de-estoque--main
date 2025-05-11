@@ -1,6 +1,6 @@
 codigo,nome,preco,quantidade,status
-1,Coxinha,5.0,30,ativo
-2,Pastel,7.0,50,ativo
-3,Hamburguer,25.0,50,ativo
-4,Pepsi,9.0,100,ativo
-5,Risolhes,6.0,40,ativo
+1,Coxinha,5.0,30,excluido
+2,Pastel,7.0,50,excluido
+3,Hamburguer,25.0,50,excluido
+4,Pepsi,9.0,100,excluido
+5,Risolhes,6.0,40,excluido

@@ -607,9 +607,9 @@ class EstoqueUI:
         for widget in self.products_table_frame.winfo_children():
             widget.destroy()
 
-        # Define headers
-        headers = ["Código", "Nome", "Preço (R$)", "Quantidade", "Status"]
-        column_widths = [0.1, 0.3, 0.15, 0.15, 0.2] # Relative widths
+        # Define headers - "Ativo" (checkbox) is now the first column
+        headers = ["Ativo", "Código", "Nome", "Preço (R$)", "Quantidade"]
+        column_widths = [0.1, 0.1, 0.3, 0.15, 0.15] # Adjusted for "Ativo" first
 
         for col, header_text in enumerate(headers):
             header_label = ctk.CTkLabel(self.products_table_frame, text=header_text, font=ctk.CTkFont(weight="bold"), anchor="center")
@@ -632,22 +632,56 @@ class EstoqueUI:
 
             for codigo in sorted_codigos:
                 dados = self.estoque.produtos[codigo]
+                
+                # Column 0: Checkbox for status
+                status_checkbox = ctk.CTkCheckBox(
+                    self.products_table_frame,
+                    text="", 
+                    onvalue="ativo", offvalue="excluido",
+                    command=lambda c=codigo: self.toggle_produto_status(c)
+                )
+                if dados['status'] == 'ativo':
+                    status_checkbox.select()
+                else:
+                    status_checkbox.deselect()
+                status_checkbox.grid(row=row_num, column=0, padx=5, pady=2, sticky="nsew")
+
+                # Subsequent columns for other data
                 data_to_display = [
                     codigo,
                     dados['nome'],
                     f"{dados['preco']:.2f}",
-                    dados['quantidade'],
-                    dados['status']
+                    dados['quantidade']
                 ]
-                for col, item_data in enumerate(data_to_display):
+                for i, item_data in enumerate(data_to_display):
                     item_label = ctk.CTkLabel(self.products_table_frame, text=str(item_data), anchor="center")
-                    item_label.grid(row=row_num, column=col, padx=5, pady=2, sticky="nsew")
+                    # Start data columns from grid column 1
+                    item_label.grid(row=row_num, column=i + 1, padx=5, pady=2, sticky="nsew")
+                
                 row_num += 1
-            if row_num == 1: # Should be caught by `if not self.estoque.produtos` but as a fallback
-                self.product_status_label.configure(text="Estoque carregado.") # Or some other neutral message
+            if row_num == 1: 
+                self.product_status_label.configure(text="Estoque carregado.") 
             else:
                  self.product_status_label.configure(text=f"{len(self.estoque.produtos)} produtos exibidos.")
 
+    def toggle_produto_status(self, product_code):
+        produto = self.estoque.produtos.get(str(product_code)) # Ensure code is string if keys are strings
+        if not produto:
+            produto = self.estoque.produtos.get(int(product_code)) # Try int if not found as string
+        
+        if not produto:
+            self.product_status_label.configure(text=f"Erro: Produto com código {product_code} não encontrado.")
+            return
+
+        if produto['status'] == 'ativo':
+            self.estoque.remover_produto(product_code) # remover_produto handles the status change
+            self.product_status_label.configure(text=f"Produto {product_code} marcado como inativo.")
+        else: # 'excluido'
+            self.estoque.reativar_produto(product_code) # reativar_produto handles the status change
+            self.product_status_label.configure(text=f"Produto {product_code} reativado.")
+        
+        self.exibir_estoque() # Refresh the table
+        self.update_consumo_comboboxes() # Update other UI elements that depend on product status
 
     def adicionar_cliente(self):
         nome = self.cliente_nome_entry.get().strip()
@@ -762,9 +796,9 @@ class EstoqueUI:
         for widget in self.clients_table_frame.winfo_children():
             widget.destroy()
 
-        headers = ["Código", "Nome", "Documento/Mesa", "Telefone", "Status"]
-        # Adjust column widths as needed
-        column_widths = [0.1, 0.3, 0.25, 0.2, 0.15] 
+        # Adjust column widths as needed. "Ativo" (checkbox) is now the first column
+        headers = ["Ativo", "Código", "Nome", "Documento/Mesa", "Telefone"]
+        column_widths = [0.1, 0.1, 0.3, 0.25, 0.2] # Adjusted for "Ativo" first
 
         for col, header_text in enumerate(headers):
             header_label = ctk.CTkLabel(self.clients_table_frame, text=header_text, font=ctk.CTkFont(weight="bold"), anchor="center")
@@ -785,19 +819,58 @@ class EstoqueUI:
 
             for codigo in sorted_codigos:
                 dados = self.clientes.clientes[codigo]
-                # 'mesa' is used for documento in Clientes model based on previous context
+
+                # Column 0: Checkbox for status
+                status_checkbox = ctk.CTkCheckBox(
+                    self.clients_table_frame,
+                    text="", 
+                    onvalue="ativo", offvalue="excluido",
+                    command=lambda c=codigo: self.toggle_cliente_status(c)
+                )
+                if dados.get('status') == 'ativo':
+                    status_checkbox.select()
+                else:
+                    status_checkbox.deselect()
+                status_checkbox.grid(row=row_num, column=0, padx=5, pady=2, sticky="nsew")
+                
+                # Subsequent columns for other data
                 data_to_display = [
                     codigo,
                     dados.get('nome', 'N/A'),
                     dados.get('mesa', 'N/A'), # 'mesa' field seems to hold Documento
-                    dados.get('telefone', 'N/A'),
-                    dados.get('status', 'N/A')
+                    dados.get('telefone', 'N/A')
                 ]
-                for col, item_data in enumerate(data_to_display):
+                for i, item_data in enumerate(data_to_display):
                     item_label = ctk.CTkLabel(self.clients_table_frame, text=str(item_data), anchor="center")
-                    item_label.grid(row=row_num, column=col, padx=5, pady=2, sticky="nsew")
+                    item_label.grid(row=row_num, column=i + 1, padx=5, pady=2, sticky="nsew")
+                
                 row_num += 1
             self.client_status_label.configure(text=f"{len(self.clientes.clientes)} clientes/mesas exibidos.")
+
+    def toggle_cliente_status(self, client_code):
+        # Ensure client_code is the correct type for dictionary lookup (likely int)
+        try:
+            code_key = int(client_code)
+        except ValueError:
+            self.client_status_label.configure(text=f"Erro: Código de cliente inválido {client_code}.")
+            return
+
+        cliente = self.clientes.clientes.get(code_key)
+        
+        if not cliente:
+            self.client_status_label.configure(text=f"Erro: Cliente com código {code_key} não encontrado.")
+            return
+
+        if cliente['status'] == 'ativo':
+            self.clientes.remover_cliente(code_key) # This method should set status to 'excluido'
+            self.client_status_label.configure(text=f"Cliente {code_key} ({cliente.get('nome','N/A')}) marcado como inativo.")
+        else: # 'excluido'
+            self.clientes.reativar_cliente(code_key) # This method should set status to 'ativo'
+            self.client_status_label.configure(text=f"Cliente {code_key} ({cliente.get('nome','N/A')}) reativado.")
+        
+        self.exibir_clientes() # Refresh the table
+        self.update_consumo_comboboxes() 
+        self.update_caixa_cliente_combobox()
             
     def salvar_e_sair(self):
         self.estoque.salvar_estoque()
